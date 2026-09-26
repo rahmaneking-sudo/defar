@@ -1,0 +1,186 @@
+name: Ranger les fichiers dans leurs dossiers
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  ranger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remettre chaque fichier dans son dossier
+        run: |
+          set -e
+          if [ ! -f main.jsx ]; then echo "Deja range, rien a faire."; exit 0; fi
+          mkdir -p .rangement
+          git mv -f Gallery.jsx .rangement/0
+          git mv -f GenerateOverlay.jsx .rangement/1
+          git mv -f Inspector.jsx .rangement/2
+          git mv -f Landing.jsx .rangement/3
+          git mv -f MediaPicker.jsx .rangement/4
+          git mv -f PayPage.jsx .rangement/5
+          git mv -f PayReturn.jsx .rangement/6
+          git mv -f PaySimulator.jsx .rangement/7
+          git mv -f Payments.jsx .rangement/8
+          git mv -f Player.jsx .rangement/9
+          git mv -f PlayerPage.jsx .rangement/10
+          git mv -f PlayerShell.jsx .rangement/11
+          git mv -f Render.jsx .rangement/12
+          git mv -f Screen.jsx .rangement/13
+          git mv -f Studio.jsx .rangement/14
+          git mv -f account.jsx .rangement/15
+          git mv -f chrome.jsx .rangement/16
+          git mv -f color.js .rangement/17
+          git mv -f commerce.jsx .rangement/18
+          git mv -f common.jsx .rangement/19
+          git mv -f 'config (3).js' .rangement/20
+          git mv -f config.js .rangement/21
+          git mv -f constants.js .rangement/22
+          git mv -f content.jsx .rangement/23
+          git mv -f context.js .rangement/24
+          git mv -f create.js .rangement/25
+          git mv -f detect.js .rangement/26
+          git mv -f download .rangement/27
+          git mv -f editorial.jsx .rangement/28
+          git mv -f env.example .rangement/29
+          git mv -f export.js .rangement/30
+          git mv -f favicon.svg .rangement/31
+          git mv -f film-poster.jpg .rangement/32
+          git mv -f film.mp4 .rangement/33
+          git mv -f film.webm .rangement/34
+          git mv -f finance.jsx .rangement/35
+          git mv -f generate.js .rangement/36
+          git mv -f health.js .rangement/37
+          git mv -f hero-poster.jpg .rangement/38
+          git mv -f hero.mp4 .rangement/39
+          git mv -f hero.webm .rangement/40
+          git mv -f http.js .rangement/41
+          git mv -f icon-map.js .rangement/42
+          git mv -f illustrations.jsx .rangement/43
+          git mv -f 'index (1).js' .rangement/44
+          git mv -f index.css .rangement/45
+          git mv -f index.js .rangement/46
+          git mv -f inline-player.mjs .rangement/47
+          git mv -f kit.js .rangement/48
+          git mv -f kit.jsx .rangement/49
+          git mv -f link.js .rangement/50
+          git mv -f llm.js .rangement/51
+          git mv -f localEdit.js .rangement/52
+          git mv -f main.jsx .rangement/53
+          git mv -f media-library.js .rangement/54
+          git mv -f media.js .rangement/55
+          git mv -f media.jsx .rangement/56
+          git mv -f nav.jsx .rangement/57
+          git mv -f normalize.js .rangement/58
+          git mv -f overlays.jsx .rangement/59
+          git mv -f panels.jsx .rangement/60
+          git mv -f payments.js .rangement/61
+          git mv -f pexels.js .rangement/62
+          git mv -f 'player (2).html' .rangement/63
+          git mv -f player-entry.jsx .rangement/64
+          git mv -f player.html .rangement/65
+          git mv -f presets.js .rangement/66
+          git mv -f prompt.js .rangement/67
+          git mv -f router.jsx .rangement/68
+          git mv -f run-all.mjs .rangement/69
+          git mv -f services.jsx .rangement/70
+          git mv -f site.jsx .rangement/71
+          git mv -f specs.js .rangement/72
+          git mv -f status.js .rangement/73
+          git mv -f store.js .rangement/74
+          git mv -f templates.js .rangement/75
+          git mv -f theme.js .rangement/76
+          git mv -f tours.js .rangement/77
+          git mv -f ui.jsx .rangement/78
+          git mv -f utils.js .rangement/79
+          git mv -f webhook-paydunya.js .rangement/80
+          git mv -f webhook-wave.js .rangement/81
+          mkdir -p api api/_lib api/pay public public/export public/media scripts shared shared/generator src src/engine src/engine/blocks src/lib src/pages src/pages/pay src/studio src/ui tests
+          git mv -f .rangement/0 src/pages/Gallery.jsx
+          git mv -f .rangement/1 src/studio/GenerateOverlay.jsx
+          git mv -f .rangement/2 src/studio/Inspector.jsx
+          git mv -f .rangement/3 src/pages/Landing.jsx
+          git mv -f .rangement/4 src/studio/MediaPicker.jsx
+          git mv -f .rangement/5 src/pages/pay/PayPage.jsx
+          git mv -f .rangement/6 src/pages/pay/PayReturn.jsx
+          git mv -f .rangement/7 src/pages/pay/PaySimulator.jsx
+          git mv -f .rangement/8 src/pages/pay/Payments.jsx
+          git mv -f .rangement/9 src/engine/Player.jsx
+          git mv -f .rangement/10 src/pages/PlayerPage.jsx
+          git mv -f .rangement/11 src/pages/PlayerShell.jsx
+          git mv -f .rangement/12 src/pages/Render.jsx
+          git mv -f .rangement/13 src/engine/Screen.jsx
+          git mv -f .rangement/14 src/studio/Studio.jsx
+          git mv -f .rangement/15 src/engine/blocks/account.jsx
+          git mv -f .rangement/16 src/engine/chrome.jsx
+          git mv -f .rangement/17 shared/color.js
+          git mv -f .rangement/18 src/engine/blocks/commerce.jsx
+          git mv -f .rangement/19 src/pages/pay/common.jsx
+          git mv -f .rangement/20 api/pay/config.js
+          git mv -f .rangement/21 src/config.js
+          git mv -f .rangement/22 shared/constants.js
+          git mv -f .rangement/23 src/engine/blocks/content.jsx
+          git mv -f .rangement/24 src/engine/context.js
+          git mv -f .rangement/25 api/pay/create.js
+          git mv -f .rangement/26 shared/detect.js
+          git mv -f .rangement/27 .gitignore
+          git mv -f .rangement/28 src/engine/blocks/editorial.jsx
+          git mv -f .rangement/29 .env.example
+          git mv -f .rangement/30 src/studio/export.js
+          git mv -f .rangement/31 public/favicon.svg
+          git mv -f .rangement/32 public/media/film-poster.jpg
+          git mv -f .rangement/33 public/media/film.mp4
+          git mv -f .rangement/34 public/media/film.webm
+          git mv -f .rangement/35 src/engine/blocks/finance.jsx
+          git mv -f .rangement/36 api/generate.js
+          git mv -f .rangement/37 api/health.js
+          git mv -f .rangement/38 public/media/hero-poster.jpg
+          git mv -f .rangement/39 public/media/hero.mp4
+          git mv -f .rangement/40 public/media/hero.webm
+          git mv -f .rangement/41 api/_lib/http.js
+          git mv -f .rangement/42 src/engine/icon-map.js
+          git mv -f .rangement/43 src/engine/illustrations.jsx
+          git mv -f .rangement/44 src/engine/blocks/index.js
+          git mv -f .rangement/45 src/index.css
+          git mv -f .rangement/46 shared/generator/index.js
+          git mv -f .rangement/47 scripts/inline-player.mjs
+          git mv -f .rangement/48 shared/generator/kit.js
+          git mv -f .rangement/49 src/ui/kit.jsx
+          git mv -f .rangement/50 api/pay/link.js
+          git mv -f .rangement/51 api/_lib/llm.js
+          git mv -f .rangement/52 src/studio/localEdit.js
+          git mv -f .rangement/53 src/main.jsx
+          git mv -f .rangement/54 shared/media-library.js
+          git mv -f .rangement/55 shared/media.js
+          git mv -f .rangement/56 src/engine/blocks/media.jsx
+          git mv -f .rangement/57 src/engine/blocks/nav.jsx
+          git mv -f .rangement/58 shared/normalize.js
+          git mv -f .rangement/59 src/engine/overlays.jsx
+          git mv -f .rangement/60 src/studio/panels.jsx
+          git mv -f .rangement/61 api/_lib/payments.js
+          git mv -f .rangement/62 api/_lib/pexels.js
+          git mv -f .rangement/63 player.html
+          git mv -f .rangement/64 src/player-entry.jsx
+          git mv -f .rangement/65 public/export/player.html
+          git mv -f .rangement/66 src/studio/presets.js
+          git mv -f .rangement/67 shared/prompt.js
+          git mv -f .rangement/68 src/router.jsx
+          git mv -f .rangement/69 tests/run-all.mjs
+          git mv -f .rangement/70 src/engine/blocks/services.jsx
+          git mv -f .rangement/71 src/ui/site.jsx
+          git mv -f .rangement/72 src/lib/specs.js
+          git mv -f .rangement/73 api/pay/status.js
+          git mv -f .rangement/74 src/studio/store.js
+          git mv -f .rangement/75 shared/generator/templates.js
+          git mv -f .rangement/76 src/engine/theme.js
+          git mv -f .rangement/77 src/lib/tours.js
+          git mv -f .rangement/78 src/engine/ui.jsx
+          git mv -f .rangement/79 shared/utils.js
+          git mv -f .rangement/80 api/pay/webhook-paydunya.js
+          git mv -f .rangement/81 api/pay/webhook-wave.js
+          rmdir .rangement 2>/dev/null || true
+          git config user.name "Defar installer"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Fichiers ranges dans leurs dossiers"
+          git push
