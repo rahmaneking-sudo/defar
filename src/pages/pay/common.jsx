@@ -70,7 +70,7 @@ export function Aurora({ colors = ['#ff6a3d', '#d8407a', '#f2b544'], opacity = 0
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
       {blobs.map((b, i) => (
-        <div key={i} className="absolute rounded-full" style={{ width: `${b.s}vmax`, height: `${b.s}vmax`, left: `${b.x}%`, top: `${b.y}%`, background: `radial-gradient(circle, ${b.c}, transparent 65%)`, filter: 'blur(60px)', opacity, animation: `blob ${b.d}s ease-in-out ${i * -4}s infinite` }} />
+        <div key={i} className="absolute rounded-full" style={{ width: `${b.s}vmax`, height: `${b.s}vmax`, left: `${b.x}%`, top: `${b.y}%`, background: `radial-gradient(circle, ${b.c} 0%, color-mix(in srgb, ${b.c} 45%, transparent) 30%, transparent 68%)`, willChange: 'transform', opacity, animation: `blob ${b.d}s ease-in-out ${i * -4}s infinite` }} />
       ))}
       <div className="grain absolute inset-0" />
     </div>

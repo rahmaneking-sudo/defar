@@ -2,15 +2,12 @@
 // LANDING — identité originale « coucher de soleil sur Dakar », vidéos animées,
 // démos en direct qui s'utilisent toutes seules.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, useScroll, useTransform, useInView } from 'motion/react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { motion, useScroll, useTransform } from 'motion/react';
 import { I, Pattern } from '../ui/kit.jsx';
 import { SiteHeader, SiteFooter, useHashScroll } from '../ui/site.jsx';
 import { Link, go } from '../router.jsx';
 import { EXAMPLES, BRAND } from '../config.js';
-import { AppPlayer, FitPhone } from '../engine/Player.jsx';
-import { localSpec } from '../lib/specs.js';
-import { TOURS, runTour } from '../lib/tours.js';
 import { mixkitSources, mixkitPoster } from '../../shared/media-library.js';
 import { MotionBg } from '../engine/ui.jsx';
 import { Illustration, CATEGORY_ILLU } from '../engine/illustrations.jsx';
@@ -31,36 +28,64 @@ function MotionArt({ tpl, primary, accent, illu = true, size = 190 }) {
   );
 }
 
-// ───────── Vidéo de fond (auto, muette, en boucle, repli élégant) ─────────
-function LoopVideo({ sources, poster, className = '', style, fallback = 'linear-gradient(135deg,#2a1320,#120f1a)' }) {
+// ───────── Réseau lent ou « économie de données » : pas de vidéo, l'affiche suffit ─────────
+const saveData = () => {
+  try {
+    const c = navigator.connection;
+    return !!(c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || '')));
+  } catch {
+    return false;
+  }
+};
+const isSmall = () => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 768px)').matches;
+
+// ───────── Vidéo de fond : chargée seulement à l'approche, en pause hors écran ─────────
+function LoopVideo({ sources, mobileSources, poster, className = '', style, fallback = 'linear-gradient(135deg,#2a1320,#120f1a)', eager = false }) {
+  const wrap = useRef(null);
   const ref = useRef(null);
+  const list = useMemo(() => (mobileSources && isSmall() ? mobileSources : sources), [sources, mobileSources]);
+  const [near, setNear] = useState(false);
   const [i, setI] = useState(0);
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
+  const [skip] = useState(saveData);
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el || skip) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setNear(true);
+          ref.current?.play?.().catch(() => {});
+        } else ref.current?.pause?.();
+      },
+      { rootMargin: eager ? '1200px 0px' : '250px 0px' }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [skip, eager]);
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
     v.muted = true;
     v.setAttribute('muted', '');
-    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? v.play().catch(() => {}) : v.pause()), { threshold: 0.1 });
-    io.observe(v);
-    return () => io.disconnect();
-  }, [i]);
+    v.play?.().catch(() => {});
+  }, [near, i]);
   return (
-    <div className={`overflow-hidden ${/\b(absolute|fixed)\b/.test(className) ? '' : 'relative'} ${className}`} style={{ background: fallback, ...style }}>
-      {poster && <img src={poster} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />}
-      {!failed && (
+    <div ref={wrap} className={`overflow-hidden ${/\b(absolute|fixed)\b/.test(className) ? '' : 'relative'} ${className}`} style={{ background: fallback, ...style }}>
+      {poster && <img src={poster} alt="" loading={eager ? 'eager' : 'lazy'} decoding="async" className="absolute inset-0 w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+      {near && !failed && (
         <video
           key={i}
           ref={ref}
-          src={sources[i]}
+          src={list[i]}
           muted
           playsInline
           autoPlay
           loop
-          preload="metadata"
+          preload="auto"
           onPlaying={() => setReady(true)}
-          onError={() => (i + 1 < sources.length ? setI(i + 1) : setFailed(true))}
+          onError={() => (i + 1 < list.length ? setI(i + 1) : setFailed(true))}
           className="absolute inset-0 w-full h-full object-cover"
           style={{ opacity: ready ? 1 : 0, transition: 'opacity .8s ease' }}
         />
@@ -69,27 +94,23 @@ function LoopVideo({ sources, poster, className = '', style, fallback = 'linear-
   );
 }
 
-// ───────── Démo en direct : une app qui s'utilise toute seule ─────────
-function LiveDemo({ cat, idea, caption, delay = 0 }) {
-  const spec = useMemo(() => localSpec(idea, { category: cat }), [cat, idea]);
-  const box = useRef(null);
-  const player = useRef(null);
-  const inView = useInView(box, { amount: 0.35 });
+// ───────── Démos (moteur complet) : chargées quand la section approche ─────────
+const LiveDemo = lazy(() => import('./landing/Demos.jsx').then((m) => ({ default: m.LiveDemo })));
+const CheckoutDemo = lazy(() => import('./landing/Demos.jsx').then((m) => ({ default: m.CheckoutDemo })));
+function Near({ children, className = '', margin = '500px 0px' }) {
+  const ref = useRef(null);
+  const [on, setOn] = useState(false);
   useEffect(() => {
-    if (!inView || !player.current || !TOURS[cat]) return;
-    const ctrl = new AbortController();
-    const t = setTimeout(() => runTour(player.current, TOURS[cat], { signal: ctrl.signal }).catch(() => {}), delay);
-    return () => (clearTimeout(t), ctrl.abort());
-  }, [inView, cat, delay]);
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && (setOn(true), io.disconnect()), { rootMargin: margin });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [margin]);
+  const ph = <div className="w-[300px] h-[620px] sm:w-[320px] sm:h-[660px] rounded-[48px] bg-white/[0.03] border border-white/[0.06]" />;
   return (
-    <div ref={box} className="flex flex-col items-center">
-      <div className="w-[300px] h-[620px] sm:w-[320px] sm:h-[660px]">
-        <FitPhone className="w-full h-full" pad={0}>
-          <AppPlayer ref={player} spec={spec} autopilot mode="play" screenId={TOURS[cat]?.start} />
-        </FitPhone>
-      </div>
-      <p className="mt-5 text-[13px] uppercase tracking-[0.16em] text-dune">{caption}</p>
-      <p className="font-display italic text-[22px] text-sand mt-1">{spec.meta.name}</p>
+    <div ref={ref} className={className}>
+      {on ? <Suspense fallback={ph}>{children}</Suspense> : ph}
     </div>
   );
 }
@@ -186,7 +207,7 @@ export default function Landing() {
       <section ref={heroRef} className="relative min-h-[100svh] flex items-center justify-center overflow-hidden">
         <motion.div className="absolute inset-0" style={{ y: heroY }}>
           <MotionArt primary="#ff6a3d" accent="#d8407a" illu={false} />
-          <LoopVideo className="absolute inset-0" sources={['/media/hero.webm', '/media/hero.mp4', ...mixkitSources('videos/45547/45547')]} poster="/media/hero-poster.jpg" fallback="transparent" />
+          <LoopVideo eager className="absolute inset-0" sources={['/media/hero.webm', '/media/hero.mp4']} mobileSources={['/media/hero-mobile.webm', '/media/hero-mobile.mp4', '/media/hero.mp4']} poster="/media/hero-poster.jpg" fallback="transparent" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(11,10,16,0.35),rgba(11,10,16,0.88)_70%)]" />
           <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-ink to-transparent" />
         </motion.div>
@@ -253,7 +274,9 @@ export default function Landing() {
               { cat: 'finance', idea: 'Tontine digitale entre amis', caption: 'Tontine · cotisation mobile', delay: 900 },
             ].map((d) => (
               <div key={d.cat} className="snap-center shrink-0">
-                <LiveDemo {...d} />
+                <Near>
+                  <LiveDemo {...d} />
+                </Near>
               </div>
             ))}
           </div>
@@ -276,7 +299,7 @@ export default function Landing() {
             {TRADES.map((t, i) => (
               <motion.button key={t.label} type="button" onClick={() => go(`/studio?tpl=${t.tpl}`)} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.2 }} transition={{ delay: (i % 4) * 0.08, duration: 0.7 }} className={`group relative overflow-hidden rounded-3xl text-left ${i % 3 === 0 ? 'aspect-[3/4]' : 'aspect-[3/4] lg:aspect-[3/4]'}`}>
                 <MotionArt tpl={t.tpl} primary={t.c[0]} accent={t.c[1]} />
-                <LoopVideo className="absolute inset-0 transition-transform duration-700 group-hover:scale-105" sources={mixkitSources(t.v)} poster={mixkitPoster(t.v, t.t)} fallback="transparent" />
+                <LoopVideo className="absolute inset-0 transition-transform duration-700 group-hover:scale-105" sources={[...mixkitSources(t.v)].reverse()} poster={mixkitPoster(t.v, t.t)} fallback="transparent" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
                   <p className="font-display text-[24px] sm:text-[28px] leading-none">{t.label}</p>
@@ -357,7 +380,9 @@ export default function Landing() {
           </motion.div>
           <motion.div {...reveal} className="relative flex justify-center">
             <div className="absolute w-[420px] h-[420px] rounded-full blur-[110px] opacity-40 bg-[radial-gradient(circle,#ff6a3d,transparent_65%)]" />
-            <CheckoutDemo />
+            <Near>
+              <CheckoutDemo />
+            </Near>
           </motion.div>
         </div>
       </section>
@@ -398,23 +423,6 @@ export default function Landing() {
       </section>
 
       <SiteFooter />
-    </div>
-  );
-}
-
-// Téléphone qui montre uniquement le paiement
-function CheckoutDemo() {
-  const spec = useMemo(
-    () =>
-      localSpec('Salon de tresses', { category: 'beauty' }),
-    []
-  );
-  const payScreen = spec.screens.find((s) => s.blocks.some((b) => b.type === 'checkout'))?.id;
-  return (
-    <div className="relative w-[300px] h-[620px] -rotate-2">
-      <FitPhone className="w-full h-full" pad={0}>
-        <AppPlayer spec={spec} screenId={payScreen} />
-      </FitPhone>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 // Briques visuelles du moteur : icônes, images, vidéos, fonds animés, avatars…
-import { useEffect, useMemo, useRef, useState, memo } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState, memo } from 'react';
+import { RtCtx } from './context.js';
 import { motion, animate, useInView, AnimatePresence } from 'motion/react';
 import { ICON_MAP } from './icon-map.js';
 import { imageSrc, videoSources } from '../../shared/media.js';
@@ -40,9 +41,9 @@ export function MotionBg({ className = '', variant = 'blobs', intensity = 1, gra
             aspectRatio: '1',
             left: `${b.x}%`,
             top: `${b.y}%`,
-            background: b.c,
-            filter: 'blur(36px)',
-            opacity: 0.75 * intensity,
+            background: `radial-gradient(circle at 50% 50%, ${b.c} 0%, color-mix(in srgb, ${b.c} 55%, transparent) 38%, transparent 70%)`,
+            opacity: 0.9 * intensity,
+            willChange: 'transform',
             animation: `blob ${b.d}s ease-in-out ${i * -3}s infinite`,
             mixBlendMode: i % 2 ? 'screen' : 'normal',
           }}
@@ -93,11 +94,14 @@ export function Img({ src, w = 800, alt = '', className = '', style, face = fals
 
 // ───────── Vidéo en boucle (lecture auto, pause hors écran, repli) ─────────
 export function Video({ src, poster, className = '', style, rounded = '', fallback = 'motion', showPoster = true }) {
+  const rt = useContext(RtCtx);
+  const still = rt?.mode === 'thumb'; // vignettes (galerie) : l'affiche suffit, zéro téléchargement vidéo
   const vs = useMemo(() => videoSources(src), [src]);
   const posterUrl = useMemo(() => imageSrc(poster, 900) || vs?.poster || null, [poster, vs]);
   const [idx, setIdx] = useState(0);
   const [failed, setFailed] = useState(!vs);
   const [ready, setReady] = useState(false);
+  const [near, setNear] = useState(false);
   const ref = useRef(null);
   const wrap = useRef(null);
   useEffect(() => {
@@ -106,28 +110,35 @@ export function Video({ src, poster, className = '', style, rounded = '', fallba
     setReady(false);
   }, [vs]);
   useEffect(() => {
+    const el = wrap.current;
+    if (!el || still) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setNear(true);
+          ref.current?.play?.().catch(() => {});
+        } else ref.current?.pause?.();
+      },
+      { rootMargin: '200px 0px', threshold: 0.01 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [still]);
+  useEffect(() => {
     const v = ref.current;
     if (!v) return;
     v.muted = true;
     v.defaultMuted = true;
     v.setAttribute('muted', '');
-    const io = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) v.play?.().catch(() => {});
-        else v.pause?.();
-      },
-      { threshold: 0.15 }
-    );
-    io.observe(wrap.current);
-    return () => io.disconnect();
-  }, [idx, failed]);
+    v.play?.().catch(() => {});
+  }, [idx, near]);
   return (
     <div ref={wrap} className={`${/\b(absolute|fixed)\b/.test(className) ? '' : 'relative'} overflow-hidden ${rounded} ${className}`} style={style}>
       {(!ready || failed) && (fallback === 'motion' ? <MotionBg grain={false} /> : <div className="absolute inset-0 bg-app-surface2" />)}
       {showPoster && posterUrl && !ready && (
         <img src={posterUrl} alt="" draggable={false} className="absolute inset-0 w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
       )}
-      {!failed && vs && (
+      {!failed && vs && near && !still && (
         <video
           key={idx}
           ref={ref}
@@ -136,7 +147,7 @@ export function Video({ src, poster, className = '', style, rounded = '', fallba
           playsInline
           autoPlay
           loop
-          preload="metadata"
+          preload="auto"
           onPlaying={() => setReady(true)}
           onError={() => (idx + 1 < vs.sources.length ? setIdx(idx + 1) : setFailed(true))}
           className="absolute inset-0 w-full h-full object-cover"
