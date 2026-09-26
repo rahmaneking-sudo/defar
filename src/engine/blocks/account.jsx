@@ -4,6 +4,7 @@ import { useRt, useScreen } from '../context.js';
 import { Avatar, Btn, Icon, Media, MotionBg, Toggle, Rich } from '../ui.jsx';
 import { Illustration, CATEGORY_ILLU } from '../illustrations.jsx';
 import { Words } from './media.jsx';
+import { LiveChat, digits } from '../live.jsx';
 
 // ───────────────────────── Onboarding plein écran ─────────────────────────
 export function Onboarding({ block }) {
@@ -251,6 +252,12 @@ export function Settings({ block }) {
 const DEFAULT_REPLIES = ['Avec plaisir ! 😊', 'C\'est noté, je m\'en occupe tout de suite.', 'Tu peux payer par Wave ou Orange Money à la réception.', 'Merci pour ta confiance 🙏'];
 export function Chat({ block }) {
   const rt = useRt();
+  if (rt.live) return <LiveChat block={block} />;
+  return <DemoChat block={block} />;
+}
+
+function DemoChat({ block }) {
+  const rt = useRt();
   const [msgs, setMsgs] = useState(() => (block.messages.length ? block.messages : [{ from: 'them', text: `Bonjour 👋 Bienvenue chez ${rt.spec.meta.name} ! Comment puis-je t'aider ?`, time: '09:41' }]));
   const [typing, setTyping] = useState(false);
   const [text, setText] = useState('');
@@ -334,18 +341,64 @@ export function Chat({ block }) {
 export function Form({ block }) {
   const rt = useRt();
   const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const formRef = useRef(null);
+  const live = !!rt.live;
+  // Site en ligne : les valeurs d'exemple deviennent de simples indications
+  const val = (f) => (live ? undefined : f.value);
+  const ph = (f) => (live ? f.placeholder || f.value || '' : f.placeholder);
+  const submit = async () => {
+    if (!live) {
+      setSent(true);
+      rt.run(block.submit?.action || { type: 'toast', message: 'Envoyé avec succès ✓' });
+      setTimeout(() => setSent(false), 1600);
+      return;
+    }
+    setErr('');
+    const champs = {};
+    const data = {};
+    const els = formRef.current?.querySelectorAll('[data-field]') || [];
+    els.forEach((el) => {
+      const f = block.fields[Number(el.dataset.field)];
+      const v = String(el.value || '').trim().slice(0, 1000);
+      if (!f || !v) return;
+      champs[f.label] = v;
+      if (f.type === 'phone' || /t[ée]l|phone|whatsapp|num[ée]ro/i.test(f.label)) data.telephone ??= v;
+      else if (f.type === 'email' || /e-?mail/i.test(f.label)) data.email ??= v;
+      else if (f.type === 'textarea' || /message|demande|question/i.test(f.label)) data.message ??= v;
+      else if (/nom|name|pr[ée]nom/i.test(f.label)) data.nom ??= v;
+    });
+    if (!Object.keys(champs).length) return setErr('Remplis le formulaire avant d\'envoyer.');
+    const phoneField = block.fields.find((f) => f.type === 'phone');
+    if (phoneField && data.telephone && digits(data.telephone).length < 8) return setErr('Numéro de téléphone invalide.');
+    setBusy(true);
+    try {
+      const kind = /inscri|adh[ée]|rejoin|abonne/i.test(`${block.title} ${block.submit?.label || ''}`) ? 'inscription' : 'message';
+      await rt.live.submit(kind, { ...data, champs });
+      formRef.current?.querySelectorAll('[data-field]').forEach((el) => (el.tagName === 'SELECT' ? null : (el.value = '')));
+      setSent(true);
+      const a = block.submit?.action;
+      if (a && ['navigate', 'tab', 'modal', 'home'].includes(a.type)) rt.run(a);
+      else rt.toast('Envoyé ✓ On te répond très vite', 'circle-check');
+      setTimeout(() => setSent(false), 2400);
+    } catch (e) {
+      setErr(e.message || 'Envoi impossible, réessaie.');
+    }
+    setBusy(false);
+  };
   return (
     <div className="px-5">
       {block.title && <h2 className="app-heading text-[22px] font-bold"><Rich text={block.title} /></h2>}
       {block.subtitle && <p className="text-[14px] text-app-muted mt-1">{block.subtitle}</p>}
-      <div className="flex flex-col gap-3 mt-4">
+      <div ref={formRef} className="flex flex-col gap-3 mt-4">
         {block.fields.map((f, i) => (
           <label key={i} className="block">
             <span className="block text-[12.5px] font-semibold text-app-muted mb-1.5 ml-1">{f.label}</span>
             {f.type === 'textarea' ? (
-              <textarea defaultValue={f.value} placeholder={f.placeholder} rows={4} className="w-full p-4 bg-app-surface outline-none text-[15px] resize-none focus:ring-2" style={{ borderRadius: 'min(var(--app-radius), 18px)', '--tw-ring-color': 'var(--app-primary)' }} />
+              <textarea data-field={i} defaultValue={val(f)} placeholder={ph(f)} rows={4} className="w-full p-4 bg-app-surface outline-none text-[15px] resize-none focus:ring-2" style={{ borderRadius: 'min(var(--app-radius), 18px)', '--tw-ring-color': 'var(--app-primary)' }} />
             ) : f.type === 'select' ? (
-              <select defaultValue={f.value || f.options[0]} className="w-full h-[52px] px-4 bg-app-surface outline-none text-[15px] appearance-none" style={{ borderRadius: 'min(var(--app-radius), 18px)', color: 'var(--app-text)' }}>
+              <select data-field={i} defaultValue={f.value || f.options[0]} className="w-full h-[52px] px-4 bg-app-surface outline-none text-[15px] appearance-none" style={{ borderRadius: 'min(var(--app-radius), 18px)', color: 'var(--app-text)' }}>
                 {(f.options.length ? f.options : ['Option 1', 'Option 2']).map((o) => (
                   <option key={o}>{o}</option>
                 ))}
@@ -353,26 +406,22 @@ export function Form({ block }) {
             ) : f.type === 'phone' ? (
               <div className="flex items-center h-[52px] bg-app-surface overflow-hidden" style={{ borderRadius: 'min(var(--app-radius), 18px)' }}>
                 <span className="h-full px-3.5 flex items-center gap-1 text-[14.5px] font-semibold border-r border-app-border">🇸🇳 +221</span>
-                <input defaultValue={f.value} placeholder={f.placeholder || '77 123 45 67'} inputMode="tel" className="flex-1 min-w-0 h-full px-3.5 bg-transparent outline-none text-[15px]" />
+                <input data-field={i} defaultValue={val(f)} placeholder={ph(f) || '77 123 45 67'} inputMode="tel" className="flex-1 min-w-0 h-full px-3.5 bg-transparent outline-none text-[15px]" />
               </div>
             ) : (
-              <input type={f.type === 'date' ? 'date' : f.type === 'email' ? 'email' : f.type === 'number' ? 'number' : f.type === 'password' ? 'password' : 'text'} defaultValue={f.value} placeholder={f.placeholder} className="w-full h-[52px] px-4 bg-app-surface outline-none text-[15px]" style={{ borderRadius: 'min(var(--app-radius), 18px)', colorScheme: rt.palette.dark ? 'dark' : 'light' }} />
+              <input data-field={i} type={f.type === 'date' ? 'date' : f.type === 'email' ? 'email' : f.type === 'number' ? 'number' : f.type === 'password' ? 'password' : 'text'} defaultValue={val(f)} placeholder={ph(f)} className="w-full h-[52px] px-4 bg-app-surface outline-none text-[15px]" style={{ borderRadius: 'min(var(--app-radius), 18px)', colorScheme: rt.palette.dark ? 'dark' : 'light' }} />
             )}
           </label>
         ))}
       </div>
-      <Btn
-        full
-        size="lg"
-        className="mt-5"
-        onClick={() => {
-          setSent(true);
-          rt.run(block.submit?.action || { type: 'toast', message: 'Envoyé avec succès ✓' });
-          setTimeout(() => setSent(false), 1600);
-        }}
-      >
-        <span className="flex items-center gap-2" data-tour="form-submit">
-          {sent ? <Icon name="check" size={18} /> : null}
+      {err && (
+        <p className="text-[13px] mt-3 font-medium" style={{ color: 'var(--app-danger)' }} role="alert">
+          {err}
+        </p>
+      )}
+      <Btn full size="lg" className="mt-5" onClick={submit} style={{ opacity: busy ? 0.7 : 1 }}>
+        <span className="flex items-center gap-2" data-tour="form-submit" data-live="form-submit">
+          {busy ? <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" /> : sent ? <Icon name="check" size={18} /> : null}
           {block.submit?.label || 'Envoyer'}
         </span>
       </Btn>

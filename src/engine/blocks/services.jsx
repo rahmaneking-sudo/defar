@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { useRt, useScreen } from '../context.js';
 import { Avatar, Btn, Icon, Img, Money, SectionHead, Rich } from '../ui.jsx';
 import { hash } from '../../../shared/utils.js';
+import { openOrder, isDemoPhone, prettyPhone } from '../live.jsx';
 
 const WEEK = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
@@ -32,7 +33,13 @@ export function Booking({ block }) {
   const confirm = () => {
     if (!slot) return rt.toast('Choisis un créneau', 'clock');
     const dateLabel = `${cur.wd === 'auj.' ? "Aujourd'hui" : cur.wd} ${cur.n} ${cur.m}`;
-    rt.setBooking({ service: svc, dateLabel, slot, staff: block.staff[staff]?.name });
+    rt.setBooking({ service: svc || { title: rt.spec.meta.name, price: 0 }, dateLabel, slot, staff: block.staff[staff]?.name });
+    // Site en ligne : la réservation est envoyée au vendeur (jamais de fausse confirmation)
+    if (rt.live) {
+      rt.setOrder(null);
+      rt.clearCart();
+      return setTimeout(() => openOrder(rt, 'reservation'), 0);
+    }
     rt.run(block.cta?.action || (rt.routes.checkout ? { type: 'navigate', to: rt.routes.checkout } : { type: 'toast', message: 'Rendez-vous confirmé ✓' }));
   };
   return (
@@ -401,8 +408,9 @@ export function Countdown({ block }) {
 // ───────────────────────── Contact ─────────────────────────
 export function Contact({ block }) {
   const rt = useRt();
+  const phone = rt.live?.whatsapp && isDemoPhone(block.phone) ? prettyPhone(rt.live.whatsapp) : block.phone;
   const rows = [
-    ['phone', block.phone],
+    ['phone', phone],
     ['map-pin', block.address],
     ['clock', block.hours],
     ['mail', block.email],
@@ -420,7 +428,7 @@ export function Contact({ block }) {
           </div>
         ))}
         <div className="grid grid-cols-2 gap-2 mt-3">
-          <Btn variant="secondary" icon="phone" onClick={() => rt.run({ type: 'call', phone: block.phone })}>
+          <Btn variant="secondary" icon="phone" onClick={() => rt.run({ type: 'call', phone })}>
             Appeler
           </Btn>
           <Btn icon="message-circle" onClick={() => rt.run({ type: 'whatsapp', phone: block.whatsapp || block.phone })} style={{ background: '#25D366', color: '#fff' }}>

@@ -8,16 +8,18 @@
     "dev": "vite",
     "build": "vite build --config vite.player.config.js && node scripts/inline-player.mjs && vite build",
     "preview": "vite preview",
-    "test": "node tests/run-all.mjs",
+    "test": "node tests/run-all.mjs && node tests/cloud.test.mjs",
     "qa": "node tools/qa-engine.mjs http://localhost:5173",
     "film:assets": "node tools/film/capture-assets.mjs",
     "film:hero": "node tools/film/render.mjs hero",
-    "film:promo": "node tools/film/render.mjs film"
+    "film:promo": "node tools/film/render.mjs film",
+    "mock:supabase": "node tools/mock-supabase/server.mjs"
   },
   "engines": {
     "node": ">=20.19"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
     "jsonrepair": "^3.15.0",
     "jszip": "^3.10.2",
     "lucide-react": "^1.48.0",
@@ -29,6 +31,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "tailwindcss": "^4.3.3",

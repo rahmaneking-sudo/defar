@@ -3,6 +3,7 @@ import LZString from 'lz-string';
 import { normalizeSpec } from '../../shared/normalize.js';
 import { generateLocal } from '../../shared/generator/index.js';
 import { uid } from '../../shared/utils.js';
+import { cloudEnabled, accessToken, useAuth } from './cloud.js';
 
 export function localSpec(idea, opts = {}) {
   return normalizeSpec(generateLocal(idea, opts)).spec;
@@ -28,17 +29,23 @@ export const setAccessCode = (c) => {
 export async function generateSpec({ idea, mode = 'create', spec, instruction, signal } = {}) {
   const started = Date.now();
   try {
+    const token = cloudEnabled ? await accessToken() : '';
     const res = await fetch('/api/generate', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-access-code': getAccessCode() },
+      headers: { 'content-type': 'application/json', 'x-access-code': getAccessCode(), ...(token ? { authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({ idea, mode, spec, instruction }),
       signal,
     });
-    if (res.status === 401) return { spec: null, needsCode: true };
     const data = await res.json().catch(() => null);
+    if (res.status === 401) return data?.error === 'login_required' ? { spec: null, needsLogin: true, message: data.message } : { spec: null, needsCode: true };
+    if (res.status === 402) {
+      if (Number.isFinite(data?.credits)) useAuth.getState().setCredits(data.credits);
+      return { spec: null, needsCredits: true, credits: data?.credits, cost: data?.cost, message: data?.message };
+    }
+    if (Number.isFinite(data?.credits)) useAuth.getState().setCredits(data.credits);
     if (data?.spec) {
       const n = normalizeSpec(data.spec).spec; // double sécurité côté navigateur
-      return { spec: n, source: data.provider || 'ai', model: data.model, fallback: !!data.fallback, warning: data.warning, ms: Date.now() - started };
+      return { spec: n, source: data.provider || 'ai', model: data.model, fallback: !!data.fallback, warning: data.warning, ms: Date.now() - started, cost: data.cost || 0 };
     }
     throw new Error(data?.error || `HTTP ${res.status}`);
   } catch (e) {
@@ -75,7 +82,7 @@ export function specFromHash(hash) {
 
 // ── Projets (stockés dans le navigateur) ──
 const KEY = 'defar.projects.v1';
-export function listProjects() {
+function readProjects() {
   try {
     const a = JSON.parse(localStorage.getItem(KEY) || '[]');
     return Array.isArray(a) ? a : [];
@@ -83,9 +90,15 @@ export function listProjects() {
     return [];
   }
 }
+// Projets de cet appareil. owner=null : projets faits sans compte ; owner=id : copie locale d'un compte.
+export function listProjects(owner) {
+  const all = readProjects();
+  if (owner === undefined) return all;
+  return all.filter((p) => (p.owner || null) === owner);
+}
 export function saveProject(p) {
-  const all = listProjects().filter((x) => x.id !== p.id);
-  const item = { id: p.id || uid('p'), name: p.spec?.meta?.name || 'Sans titre', idea: p.idea || '', updatedAt: Date.now(), spec: p.spec, history: undefined };
+  const all = readProjects().filter((x) => x.id !== p.id);
+  const item = { id: p.id || uid('p'), name: p.spec?.meta?.name || 'Sans titre', idea: p.idea || '', updatedAt: Date.now(), spec: p.spec, owner: p.owner || null };
   all.unshift(item);
   const trimmed = all.slice(0, 24);
   try {
@@ -101,11 +114,20 @@ export function saveProject(p) {
   return item;
 }
 export function getProject(id) {
-  return listProjects().find((p) => p.id === id) || null;
+  return readProjects().find((p) => p.id === id) || null;
 }
 export function deleteProject(id) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(listProjects().filter((p) => p.id !== id)));
+    localStorage.setItem(KEY, JSON.stringify(readProjects().filter((p) => p.id !== id)));
+  } catch {
+    /* ignore */
+  }
+}
+// À la déconnexion : on efface de l'appareil les copies des projets du compte (appareils partagés)
+export function forgetOwnerProjects(owner) {
+  if (!owner) return;
+  try {
+    localStorage.setItem(KEY, JSON.stringify(readProjects().filter((p) => p.owner !== owner)));
   } catch {
     /* ignore */
   }

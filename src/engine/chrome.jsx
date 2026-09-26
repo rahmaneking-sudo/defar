@@ -202,3 +202,55 @@ export function TabBar({ tabs, active, onSelect, visible, cartScreen, cartCount,
     </AnimatePresence>
   );
 }
+
+// ───────── Barre de navigation « site web » (affichage ordinateur) ─────────
+export const WEB_NAV_H = 68;
+export function WebNav({ tabs, active, onSelect, onHome, name, cartScreen, cartCount, onCart, whatsapp }) {
+  const links = tabs.filter((t) => t.screen !== cartScreen);
+  const initial = String(name || '?').trim()[0]?.toUpperCase() || '?';
+  return (
+    <nav
+      className="absolute top-0 left-0 right-0 z-[60]"
+      style={{ height: WEB_NAV_H, background: 'color-mix(in srgb, var(--app-bg) 82%, transparent)', backdropFilter: 'blur(20px) saturate(1.6)', WebkitBackdropFilter: 'blur(20px) saturate(1.6)', borderBottom: '1px solid var(--app-border)' }}
+      data-web-nav
+    >
+      <div className="h-full mx-auto flex items-center gap-8 px-6" style={{ maxWidth: 1208 }}>
+        <button type="button" onClick={onHome} className="flex items-center gap-2.5 shrink-0 min-w-0" data-tour="web-home">
+          <span className="w-9 h-9 flex items-center justify-center font-extrabold text-[16px] shrink-0" style={{ borderRadius: 'min(var(--app-radius-sm), 12px)', background: 'var(--app-primary)', color: 'var(--app-on-primary)' }}>
+            {initial}
+          </span>
+          <span className="app-heading font-extrabold text-[18px] truncate max-w-[260px]">{name}</span>
+        </button>
+        <div className="flex-1 flex items-center justify-center gap-1 min-w-0">
+          {links.length > 1 &&
+            links.map((t) => {
+              const on = t.screen === active;
+              return (
+                <button key={t.screen} type="button" onClick={() => onSelect(t.screen)} className="relative h-10 px-3.5 text-[14.5px] font-semibold whitespace-nowrap" style={{ color: on ? 'var(--app-text)' : 'var(--app-muted)' }} data-tour={`tab-${t.screen}`}>
+                  {t.label}
+                  {on && <motion.span layoutId="webnav" className="absolute left-3.5 right-3.5 -bottom-[1px] h-[2px] rounded-full" style={{ background: 'var(--app-primary)' }} transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
+                </button>
+              );
+            })}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {cartScreen && (
+            <button type="button" onClick={onCart} className="relative w-10 h-10 rounded-full flex items-center justify-center bg-app-surface" aria-label="Panier" data-cart-target="true">
+              <Icon name="shopping-bag" size={19} />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10.5px] font-bold flex items-center justify-center" style={{ background: 'var(--app-primary)', color: 'var(--app-on-primary)' }}>
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          )}
+          {whatsapp && (
+            <a href={`https://wa.me/${String(whatsapp).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="h-10 px-4 rounded-full inline-flex items-center gap-2 text-[14px] font-semibold text-white" style={{ background: '#25D366' }}>
+              <Icon name="message-circle" size={17} /> Nous écrire
+            </a>
+          )}
+        </div>
+      </div>
+    </nav>
+  );
+}

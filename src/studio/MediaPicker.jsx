@@ -1,6 +1,7 @@
 // Bibliothèque de médias : photos (Unsplash) et vidéos (Mixkit) libres de droits.
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Modal, I, Segmented, inputCls, Button } from '../ui/kit.jsx';
+import { cloudEnabled, useAuth, uploadImage } from '../lib/cloud.js';
 import { IMAGES, VIDEOS, unsplashUrl, mixkitPoster } from '../../shared/media-library.js';
 import { tokens } from '../../shared/media.js';
 
@@ -8,6 +9,22 @@ export function MediaPicker({ open, onClose, onPick, kind: initialKind = 'image'
   const [kind, setKind] = useState(initialKind);
   const [q, setQ] = useState(query);
   const [url, setUrl] = useState('');
+  const [up, setUp] = useState({ busy: false, err: '' });
+  const file = useRef(null);
+  const user = useAuth((s) => s.user);
+  const onFile = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    setUp({ busy: true, err: '' });
+    try {
+      const u = await uploadImage(f);
+      setUp({ busy: false, err: '' });
+      onPick(u, 'image');
+    } catch (err) {
+      setUp({ busy: false, err: err.message || 'Envoi impossible' });
+    }
+  };
   const results = useMemo(() => {
     const qt = tokens(q);
     const list = kind === 'video' ? VIDEOS.map((v) => ({ ref: `mx:${v[0]}#${v[1]}`, thumb: mixkitPoster(v[0], v[1]), tags: v[2] })) : IMAGES.map((v) => ({ ref: `u:${v[0]}`, thumb: unsplashUrl(v[0], 300), tags: v[1] }));
@@ -22,6 +39,26 @@ export function MediaPicker({ open, onClose, onPick, kind: initialKind = 'image'
   return (
     <Modal open={open} onClose={onClose} width={860} title="Bibliothèque de médias">
       <div className="p-5">
+        {cloudEnabled && kind === 'image' && (
+          <div className="mb-4 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <span className="w-10 h-10 rounded-xl bg-sunset/15 text-sunset flex items-center justify-center shrink-0">
+              <I n="upload" s={18} />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-[14px] font-medium">Tes propres photos</p>
+              <p className="text-[12px] text-dune">{user ? 'Photo de ta boutique, de tes produits, de ton équipe… (réduite automatiquement)' : 'Connecte-toi pour ajouter tes photos.'}</p>
+              {up.err && <p className="text-[12px] text-[#ff9aa8] mt-1">{up.err}</p>}
+            </div>
+            {user && (
+              <>
+                <input ref={file} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={onFile} />
+                <Button variant="accent" icon="upload" loading={up.busy} onClick={() => file.current?.click()}>
+                  Importer une photo
+                </Button>
+              </>
+            )}
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row gap-3">
           {allowVideo && <Segmented value={kind} onChange={setKind} options={[{ value: 'image', label: 'Photos', icon: 'image' }, { value: 'video', label: 'Vidéos', icon: 'film' }]} className="sm:w-64" />}
           <div className="relative flex-1">

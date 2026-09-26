@@ -3,12 +3,13 @@ import { useEffect, useState } from 'react';
 import { Logo, I } from './kit.jsx';
 import { Link } from '../router.jsx';
 import { BRAND } from '../config.js';
+import { cloudEnabled, storedUser } from '../lib/cloud.js';
 
 const NAV = [
   { to: '/#demo', label: 'Démos' },
   { to: '/#metiers', label: 'Métiers' },
-  { to: '/#paiement', label: 'Paiement' },
   { to: '/galerie', label: 'Galerie' },
+  { to: '/tarifs', label: 'Tarifs' },
 ];
 
 export function SiteHeader({ active }) {
@@ -21,6 +22,7 @@ export function SiteHeader({ active }) {
     return () => window.removeEventListener('scroll', on);
   }, []);
   const onLanding = typeof location !== 'undefined' && location.pathname === '/';
+  const user = storedUser();
   const item = (n, cls) =>
     onLanding && n.to.startsWith('/#') ? (
       <a key={n.to} href={n.to.slice(1)} className={cls} onClick={() => setOpen(false)}>
@@ -39,12 +41,20 @@ export function SiteHeader({ active }) {
         </Link>
         <nav className="hidden md:flex items-center gap-7 text-[14px] text-sand/70">{NAV.map((n) => item(n, `hover:text-sand transition-colors ${active === n.to ? 'text-sand' : ''}`))}</nav>
         <div className="ml-auto flex items-center gap-2">
-          <Link to="/paiements" className={`hidden sm:inline-flex h-10 px-4 items-center rounded-xl text-[14px] hover:text-sand ${active === '/paiements' ? 'text-sand' : 'text-sand/80'}`}>
-            Encaisser
-          </Link>
-          <Link to="/studio" className="h-10 px-4 inline-flex items-center gap-2 rounded-xl bg-sand text-ink text-[14px] font-semibold hover:bg-white">
-            Ouvrir le studio <I n="arrow-right" s={16} />
-          </Link>
+          {cloudEnabled && !user && (
+            <Link to="/connexion" className={`hidden sm:inline-flex h-10 px-4 items-center rounded-xl text-[14px] hover:text-sand ${active === '/connexion' ? 'text-sand' : 'text-sand/80'}`}>
+              Connexion
+            </Link>
+          )}
+          {user ? (
+            <Link to="/espace" className="h-10 px-4 inline-flex items-center gap-2 rounded-xl bg-sand text-ink text-[14px] font-semibold hover:bg-white" data-testid="header-espace">
+              <I n="user" s={16} /> Mon espace
+            </Link>
+          ) : (
+            <Link to="/studio" className="h-10 px-4 inline-flex items-center gap-2 rounded-xl bg-sand text-ink text-[14px] font-semibold hover:bg-white">
+              {cloudEnabled ? 'Créer mon site' : 'Ouvrir le studio'} <I n="arrow-right" s={16} />
+            </Link>
+          )}
           <button type="button" aria-label="Menu" onClick={() => setOpen((o) => !o)} className="md:hidden w-10 h-10 inline-flex items-center justify-center rounded-xl text-sand/80 hover:bg-white/[0.06]">
             <I n={open ? 'x' : 'menu'} s={20} />
           </button>
@@ -52,7 +62,7 @@ export function SiteHeader({ active }) {
       </div>
       {open && (
         <nav className="md:hidden px-5 pb-5 flex flex-col gap-1 text-[16px]">
-          {[...NAV, { to: '/paiements', label: 'Encaisser' }].map((n) => item(n, 'h-11 flex items-center px-3 rounded-xl text-sand/85 hover:bg-white/[0.05]'))}
+          {[...NAV, ...(cloudEnabled ? [user ? { to: '/espace', label: 'Mon espace' } : { to: '/connexion', label: 'Connexion' }] : [])].map((n) => item(n, 'h-11 flex items-center px-3 rounded-xl text-sand/85 hover:bg-white/[0.05]'))}
         </nav>
       )}
     </header>
@@ -74,8 +84,11 @@ export function SiteFooter() {
           <Link to="/galerie" className="hover:text-sand">
             Galerie
           </Link>
+          <Link to="/tarifs" className="hover:text-sand">
+            Tarifs
+          </Link>
           <Link to="/paiements" className="hover:text-sand">
-            Paiements
+            Encaisser
           </Link>
           <a href={`https://wa.me/${BRAND.whatsapp}`} target="_blank" rel="noreferrer" className="hover:text-sand">
             WhatsApp

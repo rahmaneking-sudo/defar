@@ -7,6 +7,7 @@ import { Words } from './media.jsx';
 import { useFiltered } from './content.jsx';
 import { PAY_METHODS } from '../../../shared/constants.js';
 import { formatMoney } from '../../../shared/utils.js';
+import { LiveOrderForm, LiveSuccessExtra, openOrder } from '../live.jsx';
 
 // ───────────────────────── Grille produits ─────────────────────────
 export function Products({ block }) {
@@ -293,7 +294,7 @@ const SWATCH = ['#1f2937', '#e11d48', '#f59e0b', '#10b981', '#3b82f6', '#a855f7'
 export function Cart({ block }) {
   const rt = useRt();
   useEffect(() => {
-    rt.prefillCart(block.items);
+    if (!rt.live) rt.prefillCart(block.items); // site en ligne : jamais d'articles d'exemple dans le panier d'un visiteur
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [code, setCode] = useState('');
@@ -334,7 +335,7 @@ export function Cart({ block }) {
           ))}
         </AnimatePresence>
       </div>
-      <div className="flex gap-2 mt-4">
+      {!rt.live && <div className="flex gap-2 mt-4">
         <div className="flex-1 flex items-center gap-2 h-12 px-3.5 bg-app-surface" style={{ borderRadius: 'min(var(--app-radius), 999px)' }}>
           <Icon name="tag" size={17} className="text-app-muted" />
           <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Code promo" className="flex-1 min-w-0 bg-transparent outline-none text-[14px] placeholder:text-app-muted" />
@@ -349,7 +350,7 @@ export function Cart({ block }) {
         >
           {applied ? '✓' : 'Appliquer'}
         </Btn>
-      </div>
+      </div>}
       <div className="app-card p-4 mt-4 flex flex-col gap-2.5 text-[14px]">
         <Row label="Sous-total" value={formatMoney(subtotal, rt.currency, true)} />
         {fee > 0 && <Row label={block.feeLabel} value={formatMoney(fee, rt.currency, true)} />}
@@ -366,6 +367,7 @@ export function Cart({ block }) {
         className="mt-4"
         onClick={() => {
           rt.setOrder({ status: 'draft', subtotal, fee, discount, total, lines: items.map((i) => ({ title: i.title, qty: i.qty, price: i.price * i.qty })) });
+          if (rt.live && !rt.routes.checkout) return openOrder(rt);
           rt.run(block.checkoutAction || (rt.routes.checkout ? { type: 'navigate', to: rt.routes.checkout } : null));
         }}
         style={{ boxShadow: '0 14px 28px -12px var(--app-primary)' }}
@@ -394,6 +396,13 @@ const PHONE_OK = (d) => d.length === 9 && /^7[05678]/.test(d);
 const fmtPhone = (d) => d.replace(/\D/g, '').slice(0, 9).replace(/^(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/, (m, a, b, c, e) => [a, b, c, e].filter(Boolean).join(' '));
 
 export function Checkout({ block }) {
+  const rt = useRt();
+  // Site en ligne : pas de faux paiement, la commande est envoyée au vendeur
+  if (rt.live) return <LiveOrderForm block={block} />;
+  return <DemoCheckout block={block} />;
+}
+
+function DemoCheckout({ block }) {
   const rt = useRt();
   const scr = useScreen();
   const draft = rt.order?.status === 'draft' ? rt.order : null;
@@ -658,6 +667,47 @@ function PaySheet({ method, total, phone, merchant, onDone, onCancel }) {
 // ───────────────────────── Confirmation ─────────────────────────
 export function Success({ block }) {
   const rt = useRt();
+  if (rt.live && rt.order?.status === 'sent') return <LiveSuccess block={block} />;
+  return <DemoSuccess block={block} />;
+}
+
+function LiveSuccess({ block }) {
+  const rt = useRt();
+  const o = rt.order;
+  const title = { reservation: 'Réservation *envoyée* !', abonnement: 'Demande *envoyée* !', message: 'Message *envoyé* !' }[o.kind] || 'Commande *envoyée* !';
+  const details = [
+    { label: 'Référence', value: o.ref },
+    ...(o.total > 0 ? [{ label: 'Total', value: formatMoney(o.total, rt.currency, false) }] : []),
+    { label: 'Contact', value: o.phone },
+  ];
+  return (
+    <div className="relative px-5 flex flex-col items-center text-center" style={{ paddingTop: rt.safeTop + 30, minHeight: 600 }}>
+      <Confetti />
+      <Illustration name="success" size={190} />
+      <Words as="h1" text={title} delay={0.3} className="app-heading text-[28px] font-extrabold leading-tight mt-2" />
+      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="text-[14.5px] text-app-muted mt-2 max-w-[320px] leading-relaxed">
+        {rt.spec.meta.name} a bien reçu ta demande et te contacte très vite pour confirmer.
+      </motion.p>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.85 }} className="app-card w-full mt-6 p-4 text-[14px]">
+        {details.map((d, i) => (
+          <div key={i} className={`flex justify-between gap-4 py-2 ${i ? 'border-t border-dashed border-app-border' : ''}`}>
+            <span className="text-app-muted">{d.label}</span>
+            <span className="font-semibold text-right">{d.value}</span>
+          </div>
+        ))}
+      </motion.div>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.1 }} className="w-full flex flex-col gap-2 mt-6">
+        <LiveSuccessExtra />
+        <Btn full size="lg" variant="ghost" onClick={() => (rt.setOrder(null), rt.home())}>
+          Retour à l'accueil
+        </Btn>
+      </motion.div>
+    </div>
+  );
+}
+
+function DemoSuccess({ block }) {
+  const rt = useRt();
   const o = rt.order?.status === 'paid' ? rt.order : null;
   const details = block.details?.length
     ? block.details
@@ -744,6 +794,7 @@ export function Plans({ block }) {
                 onClick={() => {
                   rt.setOrder({ status: 'draft', total: p.price, lines: [{ title: `Offre ${p.name}`, qty: 1, price: p.price }] });
                   rt.clearCart();
+                  if (rt.live && !rt.routes.checkout) return openOrder(rt);
                   rt.run(p.cta?.action || (rt.routes.checkout ? { type: 'navigate', to: rt.routes.checkout } : null));
                 }}
               >

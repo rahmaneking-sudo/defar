@@ -2,7 +2,9 @@
 import { create } from 'zustand';
 import { normalizeSpec } from '../../shared/normalize.js';
 import { deepClone, uid } from '../../shared/utils.js';
-import { saveProject } from '../lib/specs.js';
+import { saveProject, deleteProject } from '../lib/specs.js';
+import { isUuid, newId, useAuth } from '../lib/cloud.js';
+import { scheduleCloudSave } from './sync.js';
 
 const MAX_HISTORY = 60;
 let saveTimer = null;
@@ -20,10 +22,21 @@ export const useStudio = create((set, get) => ({
   device: 'iphone',
   panel: 'ai',
   chat: [],
+  site: null, // infos de publication { slug, published, settings } quand le projet est dans le compte
 
-  load({ id, idea, spec }) {
-    set({ projectId: id || uid('p'), idea: idea || '', spec, past: [], future: [], screenId: spec?.initial || spec?.screens?.[0]?.id, selected: null, chat: [] });
-    get().persist(true);
+  load({ id, idea, spec, site = null, persist = true }) {
+    // identifiants au format UUID (compatibles avec le compte en ligne)
+    let pid = id;
+    if (!isUuid(pid)) {
+      if (pid) deleteProject(pid);
+      pid = newId();
+    }
+    set({ projectId: pid, idea: idea || '', spec, site, past: [], future: [], screenId: spec?.initial || spec?.screens?.[0]?.id, selected: null, chat: [] });
+    if (persist) get().persist(true);
+    return pid;
+  },
+  setSite(site) {
+    set({ site });
   },
 
   // Remplace la spec (avec entrée dans l'historique). group=true regroupe les frappes rapides.
@@ -94,7 +107,10 @@ export const useStudio = create((set, get) => ({
     clearTimeout(saveTimer);
     const run = () => {
       const s = get();
-      if (s.spec) saveProject({ id: s.projectId, idea: s.idea, spec: s.spec });
+      if (!s.spec) return;
+      const owner = useAuth.getState().user?.id || null;
+      saveProject({ id: s.projectId, idea: s.idea, spec: s.spec, owner });
+      scheduleCloudSave({ id: s.projectId, idea: s.idea, spec: s.spec }, now ? 200 : 1200);
     };
     if (now) run();
     else saveTimer = setTimeout(run, 700);

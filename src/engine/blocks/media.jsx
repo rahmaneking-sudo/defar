@@ -24,7 +24,7 @@ export function Words({ text, className = '', delay = 0, stagger = 0.06, as = 'h
         <span key={i} className="inline-block overflow-hidden align-bottom" style={{ paddingBottom: '0.1em', marginBottom: '-0.1em' }}>
           <motion.span className={`inline-block ${t.em ? 'app-em' : ''}`} variants={{ hide: { y: '110%', rotate: 4 }, show: { y: '0%', rotate: 0, transition: { type: 'spring', stiffness: 220, damping: 26 } } }}>
             {t.w}
-            {i < tokens.length - 1 ? '\u00a0' : ''}
+            {i < tokens.length - 1 && !/^[,.)…]/.test(tokens[i + 1].w) ? '\u00a0' : ''}
           </motion.span>
         </span>
       ))}
@@ -43,18 +43,19 @@ export function Hero({ block, index }) {
   const rt = useRt();
   const scr = useScreen();
   const first = index === 0;
-  const heights = { full: rt.fullscreen ? '88dvh' : 720, tall: 590, medium: 430, short: 300 };
-  const h = first ? heights[block.height] : heights[block.height === 'full' || block.height === 'tall' ? 'medium' : block.height];
+  const web = rt.web;
+  const heights = web ? { full: '94cqh', tall: '84cqh', medium: '68cqh', short: 440 } : { full: rt.fullscreen ? '88dvh' : 720, tall: 590, medium: 430, short: 300 };
+  const h = first ? heights[block.height] : web ? 480 : heights[block.height === 'full' || block.height === 'tall' ? 'medium' : block.height];
   const y = useTransform(scr.scrollY, [0, 600], [0, first ? 190 : 0]);
   const zoom = useTransform(scr.scrollY, [-220, 0, 600], [1.3, 1.04, 1.12]);
   const fade = useTransform(scr.scrollY, [0, 330], [1, first ? 0 : 1]);
   const lift = useTransform(scr.scrollY, [0, 330], [0, first ? -46 : 0]);
   const light = block.overlay === 'light';
   const big = first && (block.height === 'full' || block.height === 'tall');
-  const titleSize = first ? (block.height === 'full' ? 46 : block.height === 'tall' ? 42 : 34) : 28;
+  const titleSize = web ? (first ? (block.height === 'short' ? 'clamp(36px, 4cqw, 56px)' : 'clamp(44px, 5.6cqw, 88px)') : 'clamp(30px, 3.2cqw, 46px)') : first ? (block.height === 'full' ? 46 : block.height === 'tall' ? 42 : 34) : 28;
   return (
     <div className={first ? 'relative' : 'px-5'}>
-      <div className={`relative overflow-hidden ${light ? '' : 'app-on-media'}`} style={{ height: h, borderRadius: first ? '0 0 34px 34px' : 'var(--app-radius-lg)' }}>
+      <div className={`relative overflow-hidden ${light ? '' : 'app-on-media'}`} style={{ height: h, minHeight: web && first ? 460 : undefined, borderRadius: first ? (web ? 0 : '0 0 34px 34px') : 'var(--app-radius-lg)' }}>
         <motion.div className="absolute inset-0" style={{ y, scale: zoom }}>
           <Media media={block.media} w={1100} />
         </motion.div>
@@ -62,7 +63,7 @@ export function Hero({ block, index }) {
         {!light && <div className="absolute inset-0 grain pointer-events-none" style={{ opacity: 0.55 }} />}
         <motion.div
           className={`absolute inset-x-0 ${block.align === 'center' ? 'inset-y-0 flex flex-col justify-center items-center text-center' : 'bottom-0'} px-6`}
-          style={{ opacity: fade, y: lift, color: light ? 'var(--app-text)' : '#fff', paddingTop: first ? rt.safeTop + 48 : 20, paddingBottom: big ? 40 : 26 }}
+          style={{ opacity: fade, y: lift, color: light ? 'var(--app-text)' : '#fff', paddingTop: first ? (web ? rt.navH + 40 : rt.safeTop + 48) : 20, paddingBottom: web ? (first ? 72 : 40) : big ? 40 : 26, ...(web && first ? { paddingLeft: 'max(24px, calc((100cqw - 1112px) / 2))', paddingRight: 'max(24px, calc((100cqw - 1112px) / 2))' } : {}) }}
         >
           {(block.badge || block.eyebrow) && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className={`flex items-center gap-3 mb-3.5 flex-wrap ${block.align === 'center' ? 'justify-center' : ''}`}>
@@ -80,7 +81,7 @@ export function Hero({ block, index }) {
           )}
           <Words text={block.title} delay={0.12} className="app-display font-extrabold" style={{ fontSize: titleSize }} />
           {block.subtitle && (
-            <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 0.86, y: 0 }} transition={{ delay: 0.5 }} className="text-[15px] leading-relaxed mt-3.5 max-w-[320px]">
+            <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 0.86, y: 0 }} transition={{ delay: 0.5 }} className={`${web ? 'text-[18px] max-w-[560px] mt-5' : 'text-[15px] max-w-[320px] mt-3.5'} leading-relaxed ${web && block.align === 'center' ? 'mx-auto' : ''}`}>
               {block.subtitle}
             </motion.p>
           )}
@@ -97,7 +98,7 @@ export function Hero({ block, index }) {
           {block.buttons?.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.72 }} className={`flex gap-2.5 mt-6 flex-wrap ${block.align === 'center' ? 'justify-center' : ''}`}>
               {block.buttons.map((b, i) => (
-                <Btn key={i} variant={i === 0 ? (light ? 'primary' : 'light') : 'glass'} icon={b.icon || undefined} onClick={() => rt.run(b.action)} size="md">
+                <Btn key={i} variant={i === 0 ? (light ? 'primary' : 'light') : 'glass'} icon={b.icon || undefined} onClick={() => rt.run(b.action)} size={web ? 'lg' : 'md'}>
                   {b.label}
                 </Btn>
               ))}

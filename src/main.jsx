@@ -2,6 +2,7 @@ import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import { useRoute } from './router.jsx';
+import { siteFromHost } from './lib/host.js';
 
 const Landing = lazy(() => import('./pages/Landing.jsx'));
 const Studio = lazy(() => import('./studio/Studio.jsx'));
@@ -12,6 +13,12 @@ const PayReturn = lazy(() => import('./pages/pay/PayReturn.jsx'));
 const PaySimulator = lazy(() => import('./pages/pay/PaySimulator.jsx'));
 const Payments = lazy(() => import('./pages/pay/Payments.jsx'));
 const Render = lazy(() => import('./pages/Render.jsx'));
+const AuthPage = lazy(() => import('./pages/account/AuthPage.jsx'));
+const Espace = lazy(() => import('./pages/account/Espace.jsx'));
+const Admin = lazy(() => import('./pages/account/Admin.jsx'));
+const Pricing = lazy(() => import('./pages/Pricing.jsx'));
+const PublicSite = lazy(() => import('./pages/PublicSite.jsx'));
+const HOST_SITE = siteFromHost();
 
 function Loader() {
   return (
@@ -24,7 +31,12 @@ function Loader() {
 function App() {
   const { path } = useRoute();
   let Page = Landing;
-  if (path.startsWith('/studio')) Page = Studio;
+  if (HOST_SITE || path.startsWith('/s/')) Page = PublicSite;
+  else if (path.startsWith('/studio')) Page = Studio;
+  else if (path === '/connexion' || path === '/nouveau-mot-de-passe') Page = AuthPage;
+  else if (path.startsWith('/espace')) Page = Espace;
+  else if (path.startsWith('/admin')) Page = Admin;
+  else if (path.startsWith('/tarifs')) Page = Pricing;
   else if (path === '/p' || path.startsWith('/p/')) Page = PlayerPage;
   else if (path.startsWith('/galerie')) Page = Gallery;
   else if (path === '/pay/retour') Page = PayReturn;

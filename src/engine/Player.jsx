@@ -6,7 +6,8 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffec
 import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { RtCtx, computeRoutes } from './context.js';
 import { themeVars, ensureFonts } from './theme.js';
-import { DeviceFrame, DEVICES, StatusBar, HomeIndicator, TabBar } from './chrome.jsx';
+import { DeviceFrame, DEVICES, StatusBar, HomeIndicator, TabBar, WebNav, WEB_NAV_H } from './chrome.jsx';
+import { isDemoPhone, intlPhone } from './live.jsx';
 import { Toast, Banner, Sheet, Flyers, StoryViewer, Lightbox, Finger } from './overlays.jsx';
 import { Screen } from './Screen.jsx';
 import { formatMoney, uid } from '../../shared/utils.js';
@@ -34,16 +35,31 @@ const SCREEN_VARIANTS = {
           : { opacity: 0, zIndex: 1, transition: { duration: 0.18 } },
 };
 
+const ACCOUNT_FIRST = new Set(['profile', 'settings', 'auth']);
+const PERSONAL = new Set(['profile', 'settings', 'auth', 'countdown', 'timeline', 'progress', 'segmented', 'ticket', 'tracking', 'stats', 'chart', 'balance']);
+export function isPersonalScreen(sc) {
+  const blocks = sc?.blocks || [];
+  if (!blocks.length) return false;
+  return ACCOUNT_FIRST.has(blocks[0].type) || blocks.every((b) => PERSONAL.has(b.type));
+}
+const WEB_NAV = { dir: 0, pres: 'push' }; // sur ordinateur : fondu entre les pages
 let keySeq = 0;
 const newKey = () => `s${++keySeq}`;
 
 export const AppPlayer = forwardRef(function AppPlayer(
-  { spec, device = 'iphone', frame = true, mode = 'play', selectedBlock, onSelectBlock, screenId: controlledScreen, onScreenChange, className = '', style, reducedMotion = false, autopilot = false },
+  { spec, device = 'iphone', frame = true, mode = 'play', selectedBlock, onSelectBlock, screenId: controlledScreen, onScreenChange, className = '', style, reducedMotion = false, autopilot = false, live = null, web = false },
   ref
 ) {
   const byId = useMemo(() => new Map(spec.screens.map((s) => [s.id, s])), [spec]);
   const routes = useMemo(() => computeRoutes(spec), [spec]);
-  const tabSet = useMemo(() => new Set(spec.tabs.map((t) => t.screen)), [spec]);
+  // Site en ligne : pas d'onglets « compte » (profil, mes rendez-vous, mes stats…) :
+  // les visiteurs n'ont pas de compte, ces écrans ne montreraient que des données d'exemple.
+  const tabs = useMemo(() => {
+    if (!live && !web) return spec.tabs;
+    const kept = spec.tabs.filter((t) => !isPersonalScreen(byId.get(t.screen)));
+    return kept.length ? kept : spec.tabs;
+  }, [spec.tabs, live, web, byId]);
+  const tabSet = useMemo(() => new Set(tabs.map((t) => t.screen)), [tabs]);
   const { vars, palette } = useMemo(() => themeVars(spec.theme), [spec.theme]);
   useEffect(() => ensureFonts(spec.theme), [spec.theme]);
 
@@ -52,7 +68,9 @@ export const AppPlayer = forwardRef(function AppPlayer(
   const safeTop = fullscreen ? 0 : d.safeTop;
   const safeBottom = fullscreen ? 0 : d.safeBottom;
 
-  const startId = byId.has(controlledScreen) ? controlledScreen : byId.has(spec.initial) ? spec.initial : spec.screens[0].id;
+  // Un site en ligne (ou l'aperçu ordinateur) s'ouvre directement sur l'accueil, sans écran de bienvenue
+  const skipIntro = (id) => (live || web) && ['onboarding', 'auth'].includes(byId.get(id)?.blocks?.[0]?.type) && routes.home && byId.has(routes.home) ? routes.home : id;
+  const startId = byId.has(controlledScreen) ? controlledScreen : skipIntro(byId.has(spec.initial) ? spec.initial : spec.screens[0].id);
   const [stack, setStack] = useState(() => [{ key: newKey(), id: startId, params: {} }]);
   const stackRef = useRef(stack);
   stackRef.current = stack;
@@ -265,11 +283,17 @@ export const AppPlayer = forwardRef(function AppPlayer(
           if (navigator.share && mode === 'play') navigator.share({ title: spec.meta.name, url: location.href }).catch(() => {});
           else showToast('Lien de partage copié', 'share-2');
           return;
-        case 'call':
+        case 'call': {
+          if (live) {
+            const num = !isDemoPhone(action.phone) ? intlPhone(action.phone) : live.whatsapp ? intlPhone(live.whatsapp) : '';
+            if (num) return void (window.__defarOpenTel || ((u) => (window.location.href = u)))(`tel:+${num}`);
+          }
           return showToast(`Appel vers ${action.phone || 'le service client'}…`, 'phone');
+        }
         case 'whatsapp': {
-          const digits = String(action.phone || '').replace(/\D/g, '');
-          if (digits && mode === 'play') window.open(`https://wa.me/${digits}${action.message ? '?text=' + encodeURIComponent(action.message) : ''}`, '_blank', 'noopener');
+          let digits = String(action.phone || '').replace(/\D/g, '');
+          if (live?.whatsapp && isDemoPhone(digits)) digits = intlPhone(live.whatsapp);
+          if (digits && mode === 'play') window.open(`https://wa.me/${intlPhone(digits)}${action.message ? '?text=' + encodeURIComponent(action.message) : ''}`, '_blank', 'noopener');
           else showToast('Ouverture de WhatsApp…', 'message-circle');
           return;
         }
@@ -280,7 +304,7 @@ export const AppPlayer = forwardRef(function AppPlayer(
         default:
       }
     },
-    [mode, routes, top.id, navigate, back, goHome, showToast, addToCart, toggleFav, spec.meta.name]
+    [mode, routes, top.id, navigate, back, goHome, showToast, addToCart, toggleFav, spec.meta.name, live]
   );
 
   // ───────── Doigt de démonstration (visites guidées & vidéos) ─────────
@@ -340,7 +364,7 @@ export const AppPlayer = forwardRef(function AppPlayer(
 
   const userAvatar = useMemo(() => pickPortrait(spec.user?.name || 'Awa Diop'), [spec.user?.name]);
   const floatingTabs = spec.theme.style === 'glass' || spec.theme.style === 'soft';
-  const tabVisible = stack.length === 1 && tabSet.has(top.id);
+  const tabVisible = !web && stack.length === 1 && tabSet.has(top.id);
 
   const rt = {
     spec,
@@ -385,6 +409,10 @@ export const AppPlayer = forwardRef(function AppPlayer(
     floatingTabs,
     stackDepth: stack.length,
     currentScreen: top.id,
+    tabs,
+    live,
+    web,
+    navH: web ? WEB_NAV_H : 0,
   };
 
   const W = fullscreen ? '100%' : d.w;
@@ -396,14 +424,20 @@ export const AppPlayer = forwardRef(function AppPlayer(
       data-style={spec.theme.style}
       data-theme={spec.theme.mode}
       data-heading={FONTS[spec.theme.headingFont] === 'serif' ? 'serif' : 'sans'}
+      data-web={web ? 'true' : undefined}
+      data-live={live ? 'true' : undefined}
       style={{ ...vars, width: W, height: H }}
     >
-      <AnimatePresence initial={false} custom={nav}>
-        <motion.div key={top.key} custom={nav} variants={SCREEN_VARIANTS} initial="initial" animate="animate" exit="exit" className="absolute inset-0" style={{ boxShadow: nav.dir > 0 ? '-12px 0 40px rgba(0,0,0,0.18)' : undefined }}>
+      <AnimatePresence initial={false} custom={web ? WEB_NAV : nav}>
+        <motion.div key={top.key} custom={web ? WEB_NAV : nav} variants={SCREEN_VARIANTS} initial="initial" animate="animate" exit="exit" className="absolute inset-0" style={{ boxShadow: !web && nav.dir > 0 ? '-12px 0 40px rgba(0,0,0,0.18)' : undefined }}>
           <Screen entry={top} screen={byId.get(top.id)} isTop canBack={stack.length > 1 || (!tabSet.has(top.id) && top.id !== homeId && top.id !== spec.initial)} isTabRoot={stack.length === 1 && tabSet.has(top.id)} />
         </motion.div>
       </AnimatePresence>
-      <TabBar tabs={spec.tabs} active={top.id} onSelect={(id) => run({ type: 'tab', to: id })} visible={tabVisible} cartScreen={routes.cart} cartCount={cartCount} floating={floatingTabs} safeBottom={safeBottom || 8} />
+      {web ? (
+        <WebNav tabs={tabs} active={stack[0]?.id} onSelect={(id) => run({ type: 'tab', to: id })} onHome={goHome} name={spec.meta.name} cartScreen={routes.cart} cartCount={cartCount} onCart={() => routes.cart && navigate(routes.cart)} whatsapp={live?.whatsapp} />
+      ) : (
+        <TabBar tabs={tabs} active={top.id} onSelect={(id) => run({ type: 'tab', to: id })} visible={tabVisible} cartScreen={routes.cart} cartCount={cartCount} floating={floatingTabs} safeBottom={safeBottom || 8} />
+      )}
       <Flyers flyers={flyers} onDone={(id) => setFlyers((f) => f.filter((x) => x.id !== id))} />
       <Sheet sheet={sheet} onClose={() => setSheet(null)} safeBottom={safeBottom} />
       <StoryViewer story={story} onClose={() => setStory(null)} />
@@ -452,6 +486,38 @@ export function FitPhone({ children, device = 'iphone', max = 1, pad = 24, class
     <div ref={box} className={`relative flex items-center justify-center ${className}`} style={style}>
       <div style={{ width: W * scale, height: H * scale }}>
         <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: 'top left' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ───────── Aperçu « ordinateur » : fenêtre de navigateur mise à l'échelle ─────────
+export function FitDesktop({ children, url = '', pad = 24, className = '', style, width = 1280, height = 800 }) {
+  const box = useRef(null);
+  const [scale, setScale] = useState(0.5);
+  const BAR = 38;
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      setScale(Math.max(0.15, Math.min(1, (r.width - pad * 2) / width, (r.height - pad * 2) / height)));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [pad, width, height]);
+  return (
+    <div ref={box} className={`relative flex items-center justify-center ${className}`} style={style}>
+      <div style={{ width: width * scale, height: height * scale }}>
+        <div style={{ width, height, transform: `scale(${scale})`, transformOrigin: 'top left', borderRadius: 14, overflow: 'hidden', boxShadow: '0 40px 90px -30px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.08)', background: '#1c1b22' }}>
+          <div style={{ height: BAR, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', background: '#1c1b22', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            {['#ff5f57', '#febc2e', '#28c840'].map((c) => (
+              <span key={c} style={{ width: 12, height: 12, borderRadius: 99, background: c }} />
+            ))}
+            <span style={{ marginLeft: 18, flex: 1, maxWidth: 520, height: 24, borderRadius: 8, background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.55)', fontSize: 12.5, display: 'flex', alignItems: 'center', padding: '0 12px', fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap', overflow: 'hidden' }}>{url}</span>
+          </div>
+          <div style={{ width, height: height - BAR, position: 'relative' }}>{children}</div>
+        </div>
       </div>
     </div>
   );

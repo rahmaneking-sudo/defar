@@ -13,7 +13,7 @@ export function corsHeaders(request) {
   const allowed = (process.env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
   if (!origin || !allowed.length) return {};
   if (allowed.includes('*') || allowed.includes(origin)) {
-    return { 'access-control-allow-origin': origin, 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type,x-access-code,x-admin-key', vary: 'origin' };
+    return { 'access-control-allow-origin': origin, 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type,authorization,x-access-code,x-admin-key', vary: 'origin' };
   }
   return {};
 }

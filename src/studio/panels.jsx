@@ -10,11 +10,13 @@ import { deepClone, uid, slugify } from '../../shared/utils.js';
 import { BLOCK_PRESETS, SCREEN_PRESETS } from './presets.js';
 import { applyLocalInstruction } from './localEdit.js';
 import { generateSpec } from '../lib/specs.js';
+import { cloudEnabled, useAuth } from '../lib/cloud.js';
+import { COSTS } from '../../shared/plans.js';
 
 // ───────────────────────── IA ─────────────────────────
 const SUGGESTIONS = ['Passe en mode sombre', 'Rends le design plus luxueux', 'Ajoute un écran de fidélité avec des points', 'Ajoute la livraison à Thiès et Mbour', 'Mets une vidéo en fond sur l\'accueil', 'Ajoute un écran de messagerie avec le support', 'Change la couleur principale en vert', 'Ajoute des avis clients sur l\'accueil'];
 
-export function AIPanel({ ai, onRegenerate, onNeedCode }) {
+export function AIPanel({ ai, onRegenerate, onNeedCode, onNeedLogin, onNeedCredits }) {
   const spec = useStudio((s) => s.spec);
   const idea = useStudio((s) => s.idea);
   const chat = useStudio((s) => s.chat);
@@ -47,6 +49,11 @@ export function AIPanel({ ai, onRegenerate, onNeedCode }) {
       pushChat({ role: 'ai', text: 'Cette modification a besoin de l\'IA. Ajoute une clé (Claude, OpenAI ou Gemini) dans Vercel — ou modifie le bloc directement en mode « Éditer » 👉', error: true });
       return;
     }
+    if (cloudEnabled && !useAuth.getState().user) {
+      pushChat({ role: 'ai', text: 'Connecte-toi pour utiliser l\'IA : c\'est gratuit pendant la phase d\'essai.', error: true });
+      onNeedLogin?.();
+      return;
+    }
     setBusy(true);
     const t0 = Date.now();
     const r = await generateSpec({ mode: 'edit', spec, instruction, idea });
@@ -56,9 +63,19 @@ export function AIPanel({ ai, onRegenerate, onNeedCode }) {
       pushChat({ role: 'ai', text: 'Code d\'accès requis pour utiliser l\'IA.', error: true });
       return;
     }
+    if (r.needsLogin) {
+      pushChat({ role: 'ai', text: r.message || 'Connecte-toi pour utiliser l\'IA.', error: true });
+      onNeedLogin?.();
+      return;
+    }
+    if (r.needsCredits) {
+      pushChat({ role: 'ai', text: r.message || 'Tu n\'as plus assez de crédits.', error: true });
+      onNeedCredits?.();
+      return;
+    }
     if (r.spec) {
       setSpec(r.spec);
-      pushChat({ role: 'ai', text: `✓ C'est fait (${Math.round((Date.now() - t0) / 1000)} s). Tu peux annuler avec Ctrl+Z.` });
+      pushChat({ role: 'ai', text: `✓ C'est fait (${Math.round((Date.now() - t0) / 1000)} s)${r.cost ? ` · ${r.cost} crédit${r.cost > 1 ? 's' : ''}` : ''}. Tu peux annuler avec Ctrl+Z.` });
     } else {
       pushChat({ role: 'ai', text: r.error || 'L\'IA n\'a pas pu appliquer la modification. Ta maquette est intacte.', error: true });
       toast('Modification non appliquée', 'error');
@@ -76,6 +93,7 @@ export function AIPanel({ ai, onRegenerate, onNeedCode }) {
           </span>
         </div>
         {idea && <p className="text-[12px] text-dune mt-2 line-clamp-3">« {idea} »</p>}
+        {cloudEnabled && ai?.ai && <p className="text-[11.5px] text-dune/80 mt-2">Chaque modification par l'IA : {COSTS.edit} crédit · les changements simples (couleurs, mode sombre…) sont gratuits.</p>}
       </div>
       <div ref={box} className="flex-1 overflow-y-auto scroll-thin px-4 py-4 flex flex-col gap-2.5">
         {!chat.length && (

@@ -4,13 +4,51 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/**/*.js": { "maxDuration": 120 }
+    "api/**/*.js": {
+      "maxDuration": 120
+    }
   },
   "rewrites": [
-    { "source": "/((?!api/|assets/|media/|export/|favicon).*)", "destination": "/index.html" }
+    {
+      "source": "/s/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|Slackbot|LinkedInBot|Discordbot|SkypeUriPreview|Googlebot|bingbot|Applebot).*"
+        }
+      ],
+      "destination": "/api/og?slug=:slug",
+      "missing": [
+        {
+          "type": "query",
+          "key": "v"
+        }
+      ]
+    },
+    {
+      "source": "/((?!api/|assets/|media/|export/|favicon).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
-    { "source": "/media/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] },
-    { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] }
+    {
+      "source": "/media/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
   ]
 }

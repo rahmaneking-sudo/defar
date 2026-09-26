@@ -4,6 +4,10 @@ import { motion, useScroll, useTransform, useMotionValueEvent } from 'motion/rea
 import { ScreenCtx, useRt } from './context.js';
 import { BLOCK_COMPONENTS } from './blocks/index.js';
 import { Avatar, Icon, RoundIcon, Money } from './ui.jsx';
+import { LiveFooter } from './live.jsx';
+
+// Écrans « formulaire » affichés dans une colonne plus étroite sur ordinateur
+const NARROW = new Set(['detail', 'cart', 'checkout', 'success', 'booking', 'auth', 'form', 'profile', 'settings', 'chat', 'ticket', 'tracking', 'plans', 'balance']);
 
 class Boundary extends Component {
   constructor(p) {
@@ -83,23 +87,28 @@ export function Screen({ entry, screen, isTop, canBack, isTabRoot }) {
   const overlay = hs !== 'none' && (hs === 'transparent' || heroFirst || detailFirst);
   const safeTop = rt.safeTop;
   const safeBottom = rt.safeBottom;
-  const tabVisible = isTabRoot && rt.spec.tabs.length > 1;
+  const web = rt.web;
+  const tabVisible = !web && isTabRoot && rt.tabs.length > 1;
   const hasDetail = blocks.some((b) => b.type === 'detail');
   const hasFooter = !!screen.footer || hasDetail;
+  const narrow = NARROW.has(first?.type) || blocks.some((b) => NARROW.has(b.type) && b.type !== 'plans');
 
   let padTop = 0;
-  if (!overlay) {
+  if (web) padTop = heroFirst ? 0 : rt.navH + 28;
+  else if (!overlay) {
     if (hs === 'none') padTop = heroFirst || first?.type === 'auth' ? 0 : safeTop + 8;
     else if (hs === 'large') padTop = safeTop + 46;
     else if (hs === 'greeting') padTop = safeTop + 8;
     else padTop = safeTop + 52;
   }
-  const padBottom = tabVisible ? (rt.floatingTabs ? 104 : 78) + safeBottom : hasFooter ? 118 + safeBottom : 30 + safeBottom;
+  const padBottom = web ? (hasFooter ? 118 : 0) : tabVisible ? (rt.floatingTabs ? 104 : 78) + safeBottom : hasFooter ? 118 + safeBottom : 30 + safeBottom;
+  const showFooter = (rt.live || web) && !hasChat && rt.mode !== 'thumb';
+  const webTitle = web && !heroFirst ? (hs === 'greeting' ? null : rt.live && blocks.some((b) => b.type === 'checkout') ? 'Ta commande' : screen.header?.title || (hs !== 'none' ? screen.title : '')) : null;
 
   // couleur de la barre d'état (claire au-dessus d'une image)
   const threshold = heroFirst ? 250 : detailFirst ? 300 : 40;
   useMotionValueEvent(scrollY, 'change', (y) => {
-    if (!isTop) return;
+    if (!isTop || web) return;
     rt.setStatusLight(rt.palette.dark || (overlay && y < threshold - 20));
   });
   useEffect(() => {
@@ -134,9 +143,10 @@ export function Screen({ entry, screen, isTop, canBack, isTabRoot }) {
   return (
     <ScreenCtx.Provider value={ctx}>
       <div className={`absolute inset-0 ${screen.background === 'surface' ? 'bg-app-surface' : 'bg-app-bg'}`}>
-        {hs !== 'none' && <TopBar screen={screen} hs={hs} overlay={overlay} canBack={canBack} scrollY={scrollY} threshold={threshold} safeTop={safeTop} />}
+        {hs !== 'none' && !web && <TopBar screen={screen} hs={hs} overlay={overlay} canBack={canBack} scrollY={scrollY} threshold={threshold} safeTop={safeTop} />}
         {hasChat ? (
-          <div className="absolute inset-0 flex flex-col" style={{ paddingTop: padTop }}>
+          <div className="absolute inset-0 flex flex-col" style={{ paddingTop: web ? rt.navH + 16 : padTop, paddingBottom: tabVisible ? (rt.floatingTabs ? 70 : 58) : 0 }} data-web-chat={web ? 'true' : undefined}>
+            {web && canBack && <WebBack title={screen.header?.title || screen.title} />}
             {blocks
               .filter((b) => b.type === 'chat')
               .slice(0, 1)
@@ -150,12 +160,23 @@ export function Screen({ entry, screen, isTop, canBack, isTabRoot }) {
               })}
           </div>
         ) : (
-          <div ref={scrollRef} className="app-scroll absolute inset-0" style={{ paddingTop: padTop, paddingBottom: padBottom }} data-screen-scroll>
-            {hs === 'large' && !overlay && <LargeTitle title={screen.header.title || screen.title} subtitle={screen.header.subtitle} />}
-            {hs === 'greeting' && !overlay && <Greeting header={screen.header} />}
+          <div ref={scrollRef} className="app-scroll absolute inset-0" style={{ paddingTop: padTop, paddingBottom: padBottom }} data-screen-scroll data-narrow={web && narrow ? 'true' : undefined}>
+            {web ? (
+              <>
+                {canBack && !heroFirst && <WebBack title={webTitle && !isTabRoot ? webTitle : ''} />}
+                {hs === 'greeting' && <Greeting header={screen.header} />}
+                {webTitle && isTabRoot && <LargeTitle title={webTitle} subtitle={screen.header?.subtitle} />}
+              </>
+            ) : (
+              <>
+                {hs === 'large' && !overlay && <LargeTitle title={screen.header.title || screen.title} subtitle={screen.header.subtitle} />}
+                {hs === 'greeting' && !overlay && <Greeting header={screen.header} />}
+              </>
+            )}
             {blocks.map((b, i) => (
               <BlockFrame key={b.id} block={b} index={i} />
             ))}
+            {showFooter && <LiveFooter />}
           </div>
         )}
         {screen.footer ? (
@@ -168,10 +189,23 @@ export function Screen({ entry, screen, isTop, canBack, isTabRoot }) {
   );
 }
 
-function LargeTitle({ title, subtitle }) {
+function WebBack({ title }) {
+  const rt = useRt();
   return (
-    <div className="px-5 pt-1 pb-4">
-      <h1 className="app-heading text-[31px] font-extrabold leading-[1.06]">{title}</h1>
+    <div className="px-5 pb-5 flex items-center gap-3" data-web-back>
+      <button type="button" onClick={rt.back} className="h-10 pl-2.5 pr-4 rounded-full inline-flex items-center gap-1.5 text-[14px] font-semibold bg-app-surface">
+        <Icon name="chevron-left" size={18} /> Retour
+      </button>
+      {title && <h1 className="app-heading text-[26px] font-extrabold truncate">{title}</h1>}
+    </div>
+  );
+}
+
+function LargeTitle({ title, subtitle }) {
+  const rt = useRt();
+  return (
+    <div className={rt.web ? 'px-5 pt-2 pb-8' : 'px-5 pt-1 pb-4'} data-web-title>
+      <h1 className="app-heading font-extrabold leading-[1.06]" style={{ fontSize: rt.web ? 44 : 31 }}>{title}</h1>
       {subtitle && <p className="text-[14px] text-app-muted mt-1.5">{subtitle}</p>}
     </div>
   );
@@ -194,9 +228,18 @@ function Greeting({ header }) {
   const rt = useRt();
   const sub = header.subtitle;
   const isLoc = sub && /dakar|thi[eè]s|plateau|almadies|m[ée]dina|parcelles|pikine|gu[ée]diawaye|rufisque|saint|mbour|ziguinchor|kaolack|touba|\d{2,}/i.test(sub);
+  // Site en ligne : pas de faux utilisateur (« Bonjour Awa »)
+  const personal = /^(bonjour|salut|hello|hi|salam|bonsoir|coucou|nanga def)\b/i.test(header.title || '');
+  const title = rt.live && personal ? `Bienvenue chez ${rt.spec.meta.name}` : header.title;
   return (
-    <div className="px-5 pt-1 pb-5 flex items-center gap-3">
-      <Avatar src={rt.userAvatar} name={rt.spec.user?.name || 'Awa'} size={46} ring />
+    <div className="px-5 pt-1 pb-5 flex items-center gap-3" data-web-title>
+      {rt.live ? (
+        <span className="w-[46px] h-[46px] rounded-full flex items-center justify-center font-extrabold text-[18px] shrink-0" style={{ background: 'var(--app-primary)', color: 'var(--app-on-primary)' }}>
+          {String(rt.spec.meta.name || '?').trim()[0]?.toUpperCase()}
+        </span>
+      ) : (
+        <Avatar src={rt.userAvatar} name={rt.spec.user?.name || 'Awa'} size={46} ring />
+      )}
       <div className="flex-1 min-w-0">
         {sub && (
           <p className="text-[12.5px] text-app-muted flex items-center gap-1 truncate">
@@ -204,7 +247,7 @@ function Greeting({ header }) {
             {sub}
           </p>
         )}
-        <h1 className="app-heading text-[20px] font-bold leading-tight truncate">{header.title}</h1>
+        <h1 className="app-heading text-[20px] font-bold leading-tight truncate">{title}</h1>
       </div>
       <HeaderActions actions={header.actions} />
     </div>
@@ -218,7 +261,8 @@ function TopBar({ screen, hs, overlay, canBack, scrollY, threshold, safeTop }) {
   const titleO = useTransform(scrollY, [threshold - 15, threshold + 15], [hs === 'compact' && !overlay ? 1 : 0, 1]);
   const border = useTransform(scrollY, [threshold, threshold + 30], [0, 1]);
   const showActions = hs !== 'greeting';
-  const title = hs === 'greeting' ? rt.spec.meta.name : screen.header.title || screen.title;
+  const liveCheckout = rt.live && screen.blocks?.some((b) => b.type === 'checkout');
+  const title = hs === 'greeting' ? rt.spec.meta.name : liveCheckout ? 'Ta commande' : screen.header.title || screen.title;
   return (
     <div className="absolute top-0 left-0 right-0 z-[40]" style={{ height: safeTop + 48 }}>
       <motion.div
@@ -249,7 +293,7 @@ function FooterBar({ label, sublabel, price, onClick, safeBottom, tour }) {
       initial={{ y: 120 }}
       animate={{ y: 0 }}
       transition={{ type: 'spring', stiffness: 380, damping: 36, delay: 0.1 }}
-      className="absolute left-0 right-0 bottom-0 z-[45] px-4 pt-6"
+      className="app-footerbar absolute left-0 right-0 bottom-0 z-[45] px-4 pt-6"
       style={{ paddingBottom: safeBottom + 8, background: 'linear-gradient(to top, var(--app-bg) 62%, color-mix(in srgb, var(--app-bg) 0%, transparent))' }}
     >
       {sublabel && <p className="text-center text-[12px] text-app-muted mb-2">{sublabel}</p>}

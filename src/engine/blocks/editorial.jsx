@@ -41,7 +41,7 @@ export function Editorial({ block }) {
             </p>
           )}
           <motion.div initial="hide" whileInView="show" viewport={{ once: true, amount: 0.5 }}>
-            <InViewWords text={block.title} className="app-display font-bold" size={block.size === 'xl' ? 38 : block.size === 'lg' ? 33 : 28} />
+            <InViewWords text={block.title} className="app-display font-bold" size={rt.web ? (block.size === 'xl' ? 'clamp(34px, 3.6cqw, 56px)' : 'clamp(30px, 3cqw, 46px)') : block.size === 'xl' ? 38 : block.size === 'lg' ? 33 : 28} />
           </motion.div>
           {block.text && (
             <motion.p {...reveal} transition={{ ...reveal.transition, delay: 0.2 }} className={`text-[15px] leading-relaxed mt-4 ${center ? 'mx-auto max-w-[310px]' : ''}`} style={{ color: dark ? 'rgba(255,255,255,0.72)' : 'var(--app-muted)' }}>

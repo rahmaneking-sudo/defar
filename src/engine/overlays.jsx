@@ -68,7 +68,7 @@ export function Sheet({ sheet, onClose, safeBottom }) {
         <motion.div key={sheet.id} className="absolute inset-0 z-[85]" initial={{ opacity: 1 }} exit={{ opacity: 1 }}>
           <motion.div className="absolute inset-0 bg-black/45" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !sheet.locked && onClose()} />
           <motion.div
-            className="absolute left-0 right-0 bottom-0 bg-app-bg overflow-hidden"
+            className="app-sheet absolute left-0 right-0 bottom-0 bg-app-bg overflow-hidden"
             style={{ borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingBottom: safeBottom + 10, maxHeight: '88%' }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}

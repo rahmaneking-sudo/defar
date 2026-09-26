@@ -204,3 +204,39 @@ body {
 /* Titres serif : graisse plus fine, plus élégante */
 .app-root[data-heading='serif'] .app-display { font-weight: 500; letter-spacing: -0.02em; }
 .app-root[data-heading='serif'] .app-heading.font-extrabold, .app-root[data-heading='serif'] .app-heading.font-bold { font-weight: 600; }
+
+/* ── Affichage « site web » sur ordinateur (sites publiés, aperçu Ordinateur) ── */
+.app-root[data-web] { container-type: size; container-name: site; }
+.app-root[data-web] [data-screen-scroll] > section,
+.app-root[data-web] [data-web-back],
+.app-root[data-web] [data-web-title],
+.app-root[data-web] [data-screen-scroll] > .greeting { max-width: 1160px; margin-left: auto; margin-right: auto; }
+.app-root[data-web] [data-screen-scroll] > section[data-block='hero']:first-child,
+.app-root[data-web] [data-screen-scroll] > section[data-block='marquee'] { max-width: none; }
+.app-root[data-web] [data-screen-scroll][data-narrow] > section,
+.app-root[data-web] [data-screen-scroll][data-narrow] > [data-web-back],
+.app-root[data-web] [data-screen-scroll][data-narrow] > [data-web-title] { max-width: 720px; }
+.app-root[data-web] [data-screen-scroll] > section { margin-bottom: 44px !important; }
+/* publications et vidéos : largeur de lecture confortable (pas d'images géantes) */
+.app-root[data-web] [data-screen-scroll] > section[data-block='feed'] { max-width: 640px; }
+.app-root[data-web] [data-screen-scroll] > section[data-block='video'] { max-width: 920px; }
+.app-root[data-web] [data-screen-scroll] > section[data-block='spacer'] { margin-bottom: 0 !important; }
+.app-root[data-web] [data-web-chat] > * { width: 100%; max-width: 760px; margin-left: auto; margin-right: auto; }
+.app-root[data-web] [data-web-chat] { border-left: 0; }
+/* barre d'action, feuilles et notifications : centrées, pas en pleine largeur */
+.app-root[data-web] .app-footerbar { max-width: 560px; margin-left: auto; margin-right: auto; background: none !important; }
+.app-root[data-web] .app-sheet { max-width: 560px; margin-left: auto; margin-right: auto; border-radius: 30px; bottom: 24px !important; }
+/* grilles plus larges */
+@container site (min-width: 760px) {
+  .app-root[data-web] [data-block='products'] .grid-cols-2,
+  .app-root[data-web] [data-block='features'] .grid-cols-2,
+  .app-root[data-web] [data-block='stats'] .grid-cols-2 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .app-root[data-web] [data-block='list'] > div > .flex-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app-root[data-web] .hscroll { scroll-snap-type: x proximity; }
+}
+@container site (min-width: 1080px) {
+  .app-root[data-web] [data-block='products'] .grid-cols-2,
+  .app-root[data-web] [data-block='features'] .grid-cols-2,
+  .app-root[data-web] [data-block='stats'] .grid-cols-2 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.app-root[data-web] .app-scroll { scrollbar-width: thin; }

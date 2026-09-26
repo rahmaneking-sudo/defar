@@ -3,7 +3,7 @@ export const BRAND = {
   name: 'Défar',
   meaning: '« construire » en wolof',
   tagline: 'Décris ton app. Elle prend vie.',
-  whatsapp: '221770000000', // ton numéro WhatsApp (format international sans +)
+  whatsapp: '221777185723', // numéro WhatsApp de Défar (format international sans +)
   email: 'contact@exemple.sn',
 };
 

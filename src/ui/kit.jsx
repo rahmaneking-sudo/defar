@@ -1,5 +1,5 @@
 // Kit d'interface de la plateforme Défar (studio, landing, paiements).
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link2, ExternalLink, CircleX, LoaderCircle, EyeOff, Printer, Webhook, TriangleAlert, RotateCcw, KeyRound, ReceiptText, Maximize2 } from 'lucide-react';
@@ -15,18 +15,20 @@ export function I({ n, s = 18, className = '', ...rest }) {
 }
 
 export function Logo({ size = 30, word = true, className = '' }) {
+  // identifiant unique : un dégradé défini dans un logo masqué ne s'afficherait pas ailleurs
+  const gid = `lg-d-${useId().replace(/:/g, '')}`;
   return (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
         <defs>
-          <linearGradient id="lg-d" x1="0" y1="0" x2="1" y2="1">
+          <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
             <stop offset="0" stopColor="#ff8a3d" />
             <stop offset="0.55" stopColor="#ff4d5e" />
             <stop offset="1" stopColor="#c8367c" />
           </linearGradient>
         </defs>
         <rect width="64" height="64" rx="18" fill="#17151f" />
-        <path d="M17 13h15c11.6 0 19 7.8 19 19s-7.4 19-19 19H17z" fill="url(#lg-d)" />
+        <path d="M17 13h15c11.6 0 19 7.8 19 19s-7.4 19-19 19H17z" fill={`url(#${gid})`} />
         <rect x="25.5" y="23" width="8" height="18" rx="3.4" fill="#17151f" />
         <circle cx="41.5" cy="32" r="3.6" fill="#f4ecdf" />
       </svg>
