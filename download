@@ -1,0 +1,8 @@
+node_modules/
+dist/
+build-player/
+.env
+.env.local
+.vercel/
+tools/film/frames-*/
+tools/film/preview/
