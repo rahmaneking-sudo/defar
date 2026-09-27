@@ -133,6 +133,26 @@ export async function signIn({ email, password }) {
   const sb = await getClient();
   return must(await sb.auth.signInWithPassword({ email: email.trim(), password }));
 }
+// ───────── Connexion avec Google ─────────
+// Le bouton n'apparaît que si Google est activé dans Supabase (Authentication → Providers → Google).
+let googlePromise = null;
+export function googleEnabled() {
+  if (!cloudEnabled) return Promise.resolve(false);
+  if (!googlePromise) {
+    googlePromise = fetch(`${URL_}/auth/v1/settings`, { headers: { apikey: KEY } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => !!s?.external?.google)
+      .catch(() => false);
+  }
+  return googlePromise;
+}
+// Part chez Google, puis revient sur la page de connexion, qui termine la connexion et renvoie vers « next ».
+export async function signInWithGoogle(next = '/espace') {
+  const sb = await getClient();
+  const redirectTo = `${location.origin}/connexion?next=${encodeURIComponent(next)}`;
+  must(await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo, queryParams: { prompt: 'select_account' } } }));
+}
+
 export async function signOut() {
   const sb = await getClient();
   const uid = useAuth.getState().user?.id;

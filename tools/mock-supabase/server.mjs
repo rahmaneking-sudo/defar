@@ -176,7 +176,23 @@ export async function startMockSupabase({ port = 54321, quiet = false } = {}) {
       }
       return send(res, 200, {});
     }
-    if (route === '/settings') return send(res, 200, { external: { email: true }, disable_signup: false, mailer_autoconfirm: true });
+    if (route === '/settings') return send(res, 200, { external: { email: true, google: true }, disable_signup: false, mailer_autoconfirm: true });
+    // Faux « Continuer avec Google » : compte Google simulé (?mock_email=…), puis retour sur le site avec la session
+    if (route === '/authorize' && req.method === 'GET') {
+      const redirect = url.searchParams.get('redirect_to') || 'http://localhost:5173/';
+      if (url.searchParams.get('provider') !== 'google') return authErr(res, 400, 'validation_failed', 'Unsupported provider');
+      const email = String(url.searchParams.get('mock_email') || 'moussa.diop@gmail.com').toLowerCase();
+      let u = (await db.query('select * from auth.users where email = $1', [email])).rows[0];
+      if (!u) {
+        const meta = { full_name: 'Moussa Diop', name: 'Moussa Diop', avatar_url: 'https://example.com/a.png', email, email_verified: true, provider_id: '1234567890', sub: '1234567890' };
+        u = (await db.query('insert into auth.users (email, encrypted_password, raw_user_meta_data) values ($1, $2, $3) returning *', [email, '', JSON.stringify(meta)])).rows[0];
+        log('inscription Google', email);
+      }
+      const s = session(u);
+      const to = `${redirect}#access_token=${s.access_token}&expires_at=${s.expires_at}&expires_in=3600&provider_token=mock&refresh_token=${s.refresh_token}&token_type=bearer`;
+      res.writeHead(302, { ...CORS, location: to });
+      return res.end();
+    }
     return authErr(res, 404, 'not_found', 'route inconnue ' + route);
   }
 

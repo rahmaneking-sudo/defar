@@ -2,12 +2,12 @@
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Link2, ExternalLink, CircleX, LoaderCircle, EyeOff, Printer, Webhook, TriangleAlert, RotateCcw, KeyRound, ReceiptText, Maximize2 } from 'lucide-react';
+import { Link2, ExternalLink, CircleX, LoaderCircle, EyeOff, Printer, Webhook, TriangleAlert, RotateCcw, KeyRound, ReceiptText, Maximize2, LogIn } from 'lucide-react';
 import { ICON_MAP } from '../engine/icon-map.js';
 import { BRAND } from '../config.js';
 
 // Icônes réservées à l'interface de la plateforme (en plus de celles des maquettes)
-const UI_ICONS = { link: Link2, 'external-link': ExternalLink, 'circle-x': CircleX, 'loader-circle': LoaderCircle, 'eye-off': EyeOff, printer: Printer, webhook: Webhook, 'triangle-alert': TriangleAlert, 'rotate-ccw': RotateCcw, 'key-round': KeyRound, 'receipt-text': ReceiptText, 'maximize-2': Maximize2 };
+const UI_ICONS = { link: Link2, 'external-link': ExternalLink, 'circle-x': CircleX, 'loader-circle': LoaderCircle, 'eye-off': EyeOff, printer: Printer, webhook: Webhook, 'triangle-alert': TriangleAlert, 'rotate-ccw': RotateCcw, 'key-round': KeyRound, 'receipt-text': ReceiptText, 'maximize-2': Maximize2, 'log-in': LogIn };
 
 export function I({ n, s = 18, className = '', ...rest }) {
   const C = ICON_MAP[n] || UI_ICONS[n] || ICON_MAP.sparkles;

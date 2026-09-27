@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Logo, I, Button } from '../../ui/kit.jsx';
 import { Link, go, useRoute } from '../../router.jsx';
-import { cloudEnabled, useAuth, signIn, signUp, sendPasswordReset, updatePassword, frError } from '../../lib/cloud.js';
+import { cloudEnabled, useAuth, signIn, signUp, sendPasswordReset, updatePassword, frError, googleEnabled, signInWithGoogle } from '../../lib/cloud.js';
 import { WELCOME_CREDITS, TRIAL } from '../../../shared/plans.js';
 
 const field = 'w-full h-12 rounded-2xl bg-white/[0.05] border border-white/10 px-4 text-[15px] text-sand placeholder:text-dune/60 outline-none focus:border-sunset/70 focus:bg-white/[0.07] transition-colors';
@@ -100,12 +100,28 @@ function Connexion({ initial, next }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(null);
+  const [google, setGoogle] = useState(false);
+  const [gBusy, setGBusy] = useState(false);
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: typeof v === 'string' ? v : v.target.value }));
 
   useEffect(() => {
     useAuth.getState().init();
     document.title = 'Connexion — Défar';
+    googleEnabled().then(setGoogle);
+    // retour de Google avec une erreur (fenêtre fermée, accès refusé…)
+    const q = new URLSearchParams(location.hash.slice(1) + '&' + location.search.slice(1));
+    if (q.get('error')) setErr(q.get('error') === 'access_denied' ? 'Connexion Google annulée.' : 'La connexion avec Google n\'a pas abouti. Réessaie ou utilise ton e-mail.');
   }, []);
+  const withGoogle = async () => {
+    setErr('');
+    setGBusy(true);
+    try {
+      await signInWithGoogle(next);
+    } catch (e2) {
+      setErr(e2.message || frError(e2));
+      setGBusy(false);
+    }
+  };
   useEffect(() => {
     if (ready && user && !done) go(next, { replace: true });
   }, [ready, user, next, done]);
@@ -169,13 +185,14 @@ function Connexion({ initial, next }) {
   return (
     <Shell>
       {mode !== 'reset' && (
-        <div className="flex p-1 rounded-2xl bg-white/[0.05] border border-white/[0.07] mb-8" role="tablist">
+        <div className="relative flex p-1 rounded-2xl bg-white/[0.05] border border-white/[0.07] mb-8" role="tablist">
+          {/* repère glissant en CSS : reste à sa place même quand la page change de hauteur */}
+          <span aria-hidden="true" className="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl bg-sand pointer-events-none" style={{ transform: `translateX(${mode === 'login' ? 100 : 0}%)`, transition: 'transform .4s cubic-bezier(.2,.9,.25,1.1)' }} />
           {[
             ['signup', 'Créer un compte'],
             ['login', 'Se connecter'],
           ].map(([m, l]) => (
             <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => (setMode(m), setErr(''))} className={`relative flex-1 h-10 rounded-xl text-[14px] font-medium transition-colors ${mode === m ? 'text-ink' : 'text-sand/70 hover:text-sand'}`}>
-              {mode === m && <motion.span layoutId="auth-tab" className="absolute inset-0 rounded-xl bg-sand" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
               <span className="relative">{l}</span>
             </button>
           ))}
@@ -183,7 +200,20 @@ function Connexion({ initial, next }) {
       )}
       <h1 className="font-display text-[44px] leading-[0.95]">{titles[mode][0]}</h1>
       <p className="text-dune mt-3 text-[14.5px]">{titles[mode][1]}</p>
-      <form onSubmit={submit} className="mt-7 space-y-3" noValidate>
+      {google && mode !== 'reset' && (
+        <>
+          <button type="button" onClick={withGoogle} disabled={gBusy} data-testid="auth-google" className="mt-7 w-full h-[52px] rounded-2xl bg-white text-[#1f1f1f] font-semibold text-[15px] inline-flex items-center justify-center gap-2.5 hover:bg-white/90 disabled:opacity-60 transition-colors">
+            {gBusy ? <I n="loader-circle" s={18} className="animate-spin" /> : <I n="log-in" s={18} />}
+            Continuer avec Google
+          </button>
+          <div className="flex items-center gap-3 mt-6 text-[12px] text-dune/80">
+            <span className="h-px flex-1 bg-white/10" />
+            ou avec ton e-mail
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+        </>
+      )}
+      <form onSubmit={submit} className={`${google && mode !== 'reset' ? 'mt-5' : 'mt-7'} space-y-3`} noValidate>
         {mode === 'signup' && (
           <>
             <input name="name" value={form.name} onChange={set('name')} placeholder="Prénom et nom" autoComplete="name" className={field} required />

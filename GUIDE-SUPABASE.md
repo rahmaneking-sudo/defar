@@ -84,6 +84,33 @@ La page `/admin` te permet de :
 4. Ouvre ce lien sur un **autre téléphone**, puis passe une commande ou une réservation.
 5. Dans **Mon espace → Messages**, la commande apparaît avec un bouton **Répondre sur WhatsApp**.
 
+## 7. Connexion avec Google (facultatif, gratuit)
+
+Le bouton **« Continuer avec Google »** apparaît tout seul sur la page de connexion dès que Google est activé dans Supabase. Tant qu'il ne l'est pas, seule la connexion par e-mail s'affiche.
+
+**Dans Google (une seule fois)** : va sur **console.cloud.google.com** avec ton compte Gmail.
+
+1. Crée un projet nommé `Defar`.
+2. Ouvre **Google Auth Platform** (ou **API et services → Écran de consentement OAuth**), puis clique sur **Commencer** :
+   - **Nom de l'application** : `Défar` ;
+   - **E-mail d'assistance** : ton e-mail ;
+   - **Audience** : **Externe**.
+3. Va dans **Clients** (ou **Identifiants**), puis **Créer un client** et remplis :
+   - **Type** : **Application Web** ;
+   - **Origines JavaScript autorisées** : `https://defar-ten.vercel.app` ;
+   - **URI de redirection autorisés** : l'adresse **Callback URL** affichée par Supabase à l'étape suivante, du type `https://xxxx.supabase.co/auth/v1/callback`.
+4. Copie l'**ID client** et le **Code secret du client**.
+5. Dans **Audience**, clique sur **Publier l'application** (« En production »). Sans ça, seuls des comptes « testeurs » peuvent se connecter.
+
+**Dans Supabase** : va dans **Authentication → Sign In / Providers → Google**.
+
+1. Active Google.
+2. Colle l'ID client et le code secret.
+3. Enregistre.
+
+> Le code secret Google se met **uniquement dans Supabase**, jamais dans Vercel ni sur GitHub.
+> Défar ne demande à Google que le nom et l'e-mail de la personne.
+
 ---
 
 ### À savoir avant de faire payer
