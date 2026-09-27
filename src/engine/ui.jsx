@@ -4,7 +4,8 @@ import { RtCtx } from './context.js';
 import { motion, animate, useInView, AnimatePresence } from 'motion/react';
 import { ICON_MAP } from './icon-map.js';
 import { imageSrc, videoSources } from '../../shared/media.js';
-import { formatMoney, hash, initials } from '../../shared/utils.js';
+import { formatMoney, hash, initials, groupThousands } from '../../shared/utils.js';
+import { pauseOffscreen, saveData } from '../lib/offscreen.js';
 
 // ───────── Icône ─────────
 export const Icon = memo(function Icon({ name, size = 20, className = '', strokeWidth = 2, style }) {
@@ -20,15 +21,20 @@ export const Icon = memo(function Icon({ name, size = 20, className = '', stroke
 });
 
 // ───────── Fond animé (motion design sans aucun fichier externe) ─────────
+const BLOBS = [
+  { c: 'var(--app-primary)', s: 70, x: -15, y: -10, d: 16 },
+  { c: 'var(--app-accent)', s: 60, x: 45, y: 25, d: 19 },
+  { c: 'color-mix(in srgb, var(--app-primary) 60%, #ffffff)', s: 45, x: 10, y: 55, d: 23 },
+  { c: 'color-mix(in srgb, var(--app-accent) 55%, #000000)', s: 55, x: 60, y: -20, d: 27 },
+];
 export function MotionBg({ className = '', variant = 'blobs', intensity = 1, grain = true, children, style }) {
-  const blobs = [
-    { c: 'var(--app-primary)', s: 70, x: -15, y: -10, d: 16 },
-    { c: 'var(--app-accent)', s: 60, x: 45, y: 25, d: 19 },
-    { c: 'color-mix(in srgb, var(--app-primary) 60%, #ffffff)', s: 45, x: 10, y: 55, d: 23 },
-    { c: 'color-mix(in srgb, var(--app-accent) 55%, #000000)', s: 55, x: 60, y: -20, d: 27 },
-  ];
+  const ref = useRef(null);
+  // hors écran : les taches de couleur s'arrêtent (voir src/lib/offscreen.js)
+  useEffect(() => pauseOffscreen(ref.current), []);
+  const blobs = BLOBS;
   return (
     <div
+      ref={ref}
       className={`absolute inset-0 overflow-hidden ${grain ? 'grain' : ''} ${className}`}
       style={{ background: variant === 'dark' ? 'linear-gradient(160deg, #0d0b14, color-mix(in srgb, var(--app-primary) 35%, #0d0b14))' : 'linear-gradient(145deg, color-mix(in srgb, var(--app-primary) 88%, #000), color-mix(in srgb, var(--app-accent) 70%, var(--app-primary)))', ...style }}
     >
@@ -42,10 +48,9 @@ export function MotionBg({ className = '', variant = 'blobs', intensity = 1, gra
             left: `${b.x}%`,
             top: `${b.y}%`,
             background: `radial-gradient(circle at 50% 50%, ${b.c} 0%, color-mix(in srgb, ${b.c} 55%, transparent) 38%, transparent 70%)`,
-            opacity: 0.9 * intensity,
-            willChange: 'transform',
+            // pas de « mode de fusion » : il obligeait le téléphone à recalculer toute la zone à chaque image
+            opacity: (i % 2 ? 0.8 : 0.9) * intensity,
             animation: `blob ${b.d}s ease-in-out ${i * -3}s infinite`,
-            mixBlendMode: i % 2 ? 'screen' : 'normal',
           }}
         />
       ))}
@@ -95,7 +100,9 @@ export function Img({ src, w = 800, alt = '', className = '', style, face = fals
 // ───────── Vidéo en boucle (lecture auto, pause hors écran, repli) ─────────
 export function Video({ src, poster, className = '', style, rounded = '', fallback = 'motion', showPoster = true }) {
   const rt = useContext(RtCtx);
-  const still = rt?.mode === 'thumb'; // vignettes (galerie) : l'affiche suffit, zéro téléchargement vidéo
+  // vignettes (galerie) ou connexion lente / économie de données : l'affiche suffit, zéro téléchargement vidéo
+  const [slow] = useState(saveData);
+  const still = rt?.mode === 'thumb' || slow;
   const vs = useMemo(() => videoSources(src), [src]);
   const posterUrl = useMemo(() => imageSrc(poster, 900) || vs?.poster || null, [poster, vs]);
   const [idx, setIdx] = useState(0);
@@ -224,18 +231,24 @@ export function Stars({ value = 5, size = 12 }) {
 }
 
 // ───────── Nombre animé ─────────
-export function CountUp({ value = 0, duration = 1.1, format = (n) => Math.round(n).toLocaleString('fr-FR').replace(/ | /g, ' '), className = '' }) {
+// Compteur animé : le texte est écrit directement (pas de re-rendu React à chaque image).
+export function CountUp({ value = 0, duration = 1.1, format = groupThousands, className = '' }) {
+  const rt = useContext(RtCtx);
+  const still = rt?.mode === 'thumb' || rt?.mode === 'edit';
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, amount: 0.3 });
-  const [v, setV] = useState(0);
+  const fmt = useRef(format);
+  fmt.current = format;
+  const target = Number(value) || 0;
   useEffect(() => {
-    if (!inView) return;
-    const c = animate(0, Number(value) || 0, { duration, ease: [0.16, 1, 0.3, 1], onUpdate: setV });
+    if (!inView || still) return;
+    const el = ref.current;
+    const c = animate(0, target, { duration, ease: [0.16, 1, 0.3, 1], onUpdate: (n) => el && (el.textContent = fmt.current(n)) });
     return () => c.stop();
-  }, [inView, value, duration]);
+  }, [inView, target, duration, still]);
   return (
     <span ref={ref} className={className} style={{ fontVariantNumeric: 'tabular-nums' }}>
-      {format(v)}
+      {format(still ? target : 0)}
     </span>
   );
 }
@@ -354,7 +367,7 @@ export function Qty({ value, onChange, min = 1, max = 20, size = 'md' }) {
 export function Toggle({ on, onChange }) {
   return (
     <button type="button" onClick={(e) => { e.stopPropagation(); onChange?.(!on); }} className="relative rounded-full shrink-0" style={{ width: 50, height: 30, background: on ? 'var(--app-success)' : 'var(--app-surface2)', transition: 'background .25s' }} aria-pressed={on}>
-      <motion.span layout transition={{ type: 'spring', stiffness: 600, damping: 32 }} className="absolute top-[3px] rounded-full bg-white" style={{ width: 24, height: 24, left: on ? 23 : 3, boxShadow: '0 2px 6px rgba(0,0,0,.2)' }} />
+      <motion.span initial={false} animate={{ x: on ? 20 : 0 }} transition={{ type: 'spring', stiffness: 600, damping: 32 }} className="absolute top-[3px] rounded-full bg-white" style={{ width: 24, height: 24, left: 3, boxShadow: '0 2px 6px rgba(0,0,0,.2)' }} />
     </button>
   );
 }

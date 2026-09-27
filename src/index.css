@@ -78,6 +78,10 @@
   60% { transform: translate(-2%, -1%); }
   80% { transform: translate(3%, 3%); }
 }
+@keyframes nudge {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
 @keyframes typing {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
   30% { transform: translateY(-4px); opacity: 1; }
@@ -190,6 +194,23 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .kenburns, .grain::after, .shimmer-sweep::before { animation: none !important; }
+}
+
+/* ── Économie d'énergie ─────────────────────────────────────────────
+   Zones hors écran (attribut posé par src/lib/offscreen.js) : animations en pause. */
+[data-off], [data-off] *, [data-off] *::before, [data-off] *::after { animation-play-state: paused !important; }
+
+/* Téléphones et tablettes : mêmes couleurs, sans les effets qui font chauffer le processeur graphique.
+   - le grain animé en « mode de fusion » recalculait tout l'écran en continu ;
+   - le flou d'arrière-plan (verre dépoli) est remplacé par des fonds plus opaques. */
+@media (hover: none), (pointer: coarse) {
+  .grain::after { display: none; }
+  *, *::before, *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  .app-root[data-style='glass'] .app-card { background: color-mix(in srgb, var(--app-elevated) 94%, transparent); }
+  /* barres (onglets, en-têtes) : presque opaques, pour que le texte dessous ne transparaisse pas */
+  .app-root .fx-bar { background: color-mix(in srgb, var(--app-bg) 97%, transparent) !important; }
+  .app-root .fx-bar-el { background: color-mix(in srgb, var(--app-elevated) 97%, transparent) !important; }
+  .kenburns { animation-duration: 22s; }
 }
 
 /* Impression du reçu de paiement : seule la zone .print-area est imprimée */

@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'motion/react';
 import { useRt, useScreen } from '../context.js';
 import { Icon, Img, SectionHead, Btn } from '../ui.jsx';
@@ -79,12 +79,11 @@ function FilterSheet({ close }) {
 
 export function Chips({ block }) {
   const [sel, setSel] = useState(block.selected || 0);
-  const id = useId();
   return (
     <div className="hscroll gap-2 px-5 pb-0.5">
       {block.items.map((c, i) => (
         <motion.button key={i} type="button" whileTap={{ scale: 0.94 }} onClick={() => setSel(i)} className="relative shrink-0 h-10 px-4 flex items-center gap-1.5 text-[14px] font-semibold" style={{ borderRadius: 999, color: i === sel ? 'var(--app-on-primary)' : 'var(--app-text)' }}>
-          {i === sel ? <motion.span layoutId={`chip-${id}`} className="absolute inset-0 rounded-full" style={{ background: 'var(--app-primary)' }} transition={{ type: 'spring', stiffness: 500, damping: 36 }} /> : <span className="absolute inset-0 rounded-full bg-app-surface" />}
+          {i === sel ? <motion.span className="absolute inset-0 rounded-full" style={{ background: 'var(--app-primary)' }} initial={{ scale: 0.86, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 520, damping: 32 }} /> : <span className="absolute inset-0 rounded-full bg-app-surface" />}
           {c.icon && <Icon name={c.icon} size={16} className="relative" />}
           <span className="relative whitespace-nowrap">{c.label}</span>
         </motion.button>
@@ -95,13 +94,12 @@ export function Chips({ block }) {
 
 export function Segmented({ block }) {
   const [sel, setSel] = useState(0);
-  const id = useId();
   return (
     <div className="px-5">
       <div className="relative flex p-1 bg-app-surface" style={{ borderRadius: 'min(var(--app-radius), 999px)' }}>
+        <span aria-hidden="true" className="absolute top-1 bottom-1 left-1 bg-app-elevated pointer-events-none" style={{ width: `calc((100% - 8px) / ${block.items.length || 1})`, transform: `translateX(${sel * 100}%)`, transition: 'transform .42s cubic-bezier(.2,.9,.25,1.1)', borderRadius: 'min(calc(var(--app-radius) - 4px), 999px)', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }} />
         {block.items.map((label, i) => (
-          <button key={i} type="button" onClick={() => setSel(i)} className="relative flex-1 h-10 text-[14px] font-semibold" style={{ color: i === sel ? 'var(--app-text)' : 'var(--app-muted)' }}>
-            {i === sel && <motion.span layoutId={`seg-${id}`} className="absolute inset-0 bg-app-elevated" style={{ borderRadius: 'min(calc(var(--app-radius) - 4px), 999px)', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }} transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
+          <button key={i} type="button" onClick={() => setSel(i)} className="relative flex-1 h-10 text-[14px] font-semibold" style={{ color: i === sel ? 'var(--app-text)' : 'var(--app-muted)', transition: 'color .2s' }}>
             <span className="relative">{label}</span>
           </button>
         ))}

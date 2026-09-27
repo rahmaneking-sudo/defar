@@ -3,7 +3,7 @@
 // démos en direct qui s'utilisent toutes seules.
 // ─────────────────────────────────────────────────────────────────────────────
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { motion, useScroll, useTransform } from 'motion/react';
+import { motion, useMotionValue, useTransform } from 'motion/react';
 import { I, Pattern } from '../ui/kit.jsx';
 import { SiteHeader, SiteFooter, useHashScroll } from '../ui/site.jsx';
 import { Link, go } from '../router.jsx';
@@ -12,6 +12,9 @@ import { mixkitSources, mixkitPoster } from '../../shared/media-library.js';
 import { MotionBg } from '../engine/ui.jsx';
 import { Illustration, CATEGORY_ILLU } from '../engine/illustrations.jsx';
 import { themeVars } from '../engine/theme.js';
+import { isTouch, pauseAllOffscreen, saveData, useIdle, useQueuedMount, whenIdle } from '../lib/offscreen.js';
+
+const FX = !isTouch(); // flous et effets lourds : seulement sur ordinateur
 
 // ───────── Fond animé de secours (si la vidéo ne charge pas, rien n'est jamais vide) ─────────
 function MotionArt({ tpl, primary, accent, illu = true, size = 190 }) {
@@ -28,52 +31,62 @@ function MotionArt({ tpl, primary, accent, illu = true, size = 190 }) {
   );
 }
 
-// ───────── Réseau lent ou « économie de données » : pas de vidéo, l'affiche suffit ─────────
-const saveData = () => {
-  try {
-    const c = navigator.connection;
-    return !!(c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || '')));
-  } catch {
-    return false;
-  }
-};
+// Petit écran : vidéos allégées
 const isSmall = () => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 768px)').matches;
 
 // ───────── Vidéo de fond : chargée seulement à l'approche, en pause hors écran ─────────
-function LoopVideo({ sources, mobileSources, poster, className = '', style, fallback = 'linear-gradient(135deg,#2a1320,#120f1a)', eager = false }) {
+// - le fond animé (art) ne sert que tant que l'affiche n'est pas là : plus rien ne tourne derrière une image ;
+// - la vidéo se télécharge à l'approche mais ne joue que si elle est vraiment visible ;
+// - la vidéo du haut attend que la page soit chargée (l'affiche s'affiche tout de suite).
+function LoopVideo({ sources, mobileSources, poster, className = '', style, fallback = 'linear-gradient(135deg,#2a1320,#120f1a)', eager = false, art = null }) {
   const wrap = useRef(null);
   const ref = useRef(null);
+  const visible = useRef(false);
   const list = useMemo(() => (mobileSources && isSmall() ? mobileSources : sources), [sources, mobileSources]);
   const [near, setNear] = useState(false);
   const [i, setI] = useState(0);
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
+  const [posterOk, setPosterOk] = useState(false);
   const [skip] = useState(saveData);
   useEffect(() => {
     const el = wrap.current;
     if (!el || skip) return;
-    const io = new IntersectionObserver(
+    let stopIdle = () => {};
+    const nearIo = new IntersectionObserver(
       ([e]) => {
-        if (e.isIntersecting) {
-          setNear(true);
-          ref.current?.play?.().catch(() => {});
-        } else ref.current?.pause?.();
+        if (!e.isIntersecting) return;
+        nearIo.disconnect();
+        if (eager) stopIdle = whenIdle(() => setNear(true), 2500);
+        else setNear(true);
       },
-      { rootMargin: eager ? '1200px 0px' : '250px 0px' }
+      { rootMargin: eager ? '1200px 0px' : '300px 0px' }
     );
-    io.observe(el);
-    return () => io.disconnect();
+    const playIo = new IntersectionObserver(
+      ([e]) => {
+        visible.current = e.isIntersecting;
+        const v = ref.current;
+        if (!v) return;
+        if (e.isIntersecting) v.play?.().catch(() => {});
+        else v.pause?.();
+      },
+      { threshold: 0.15 }
+    );
+    nearIo.observe(el);
+    playIo.observe(el);
+    return () => (nearIo.disconnect(), playIo.disconnect(), stopIdle());
   }, [skip, eager]);
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
     v.muted = true;
     v.setAttribute('muted', '');
-    v.play?.().catch(() => {});
+    if (visible.current) v.play?.().catch(() => {});
   }, [near, i]);
   return (
     <div ref={wrap} className={`overflow-hidden ${/\b(absolute|fixed)\b/.test(className) ? '' : 'relative'} ${className}`} style={{ background: fallback, ...style }}>
-      {poster && <img src={poster} alt="" loading={eager ? 'eager' : 'lazy'} decoding="async" className="absolute inset-0 w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+      {art && !posterOk && !ready && art}
+      {poster && <img src={poster} alt="" loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : undefined} decoding="async" className="absolute inset-0 w-full h-full object-cover" onLoad={() => setPosterOk(true)} onError={(e) => (e.currentTarget.style.display = 'none')} />}
       {near && !failed && (
         <video
           key={i}
@@ -81,9 +94,9 @@ function LoopVideo({ sources, mobileSources, poster, className = '', style, fall
           src={list[i]}
           muted
           playsInline
-          autoPlay
           loop
-          preload="auto"
+          preload={eager ? 'auto' : 'metadata'}
+          onLoadedData={(e) => visible.current && e.currentTarget.play?.().catch(() => {})}
           onPlaying={() => setReady(true)}
           onError={() => (i + 1 < list.length ? setI(i + 1) : setFailed(true))}
           className="absolute inset-0 w-full h-full object-cover"
@@ -97,19 +110,36 @@ function LoopVideo({ sources, mobileSources, poster, className = '', style, fall
 // ───────── Démos (moteur complet) : chargées quand la section approche ─────────
 const LiveDemo = lazy(() => import('./landing/Demos.jsx').then((m) => ({ default: m.LiveDemo })));
 const CheckoutDemo = lazy(() => import('./landing/Demos.jsx').then((m) => ({ default: m.CheckoutDemo })));
-function Near({ children, className = '', margin = '500px 0px' }) {
+function Near({ children, className = '', margin = '500px 0px', early = false }) {
   const ref = useRef(null);
-  const [on, setOn] = useState(false);
+  const size = useRef(null);
+  const [near, setNear] = useState(false);
+  const [shown, setShown] = useState(false);
+  // early : préparée pendant un temps libre après le chargement, avant même que l'on défile
+  const idle = useIdle(3500);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const io = new IntersectionObserver(([e]) => e.isIntersecting && (setOn(true), io.disconnect()), { rootMargin: margin });
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && (setNear(true), io.disconnect()), { rootMargin: margin });
+    // hors écran, la démo n'est plus dessinée (content-visibility) : le téléphone ne travaille plus pour elle,
+    // mais tout reste prêt, donc elle réapparaît instantanément
+    const vis = new IntersectionObserver(
+      ([e]) => {
+        if (!e.isIntersecting && el.offsetHeight) size.current = [el.offsetWidth, el.offsetHeight];
+        setShown(e.isIntersecting);
+      },
+      { rootMargin: '300px 200px' }
+    );
     io.observe(el);
-    return () => io.disconnect();
+    vis.observe(el);
+    return () => (io.disconnect(), vis.disconnect());
   }, [margin]);
+  // une démo à la fois, en rendu interruptible : le défilement reste fluide
+  const on = useQueuedMount(near || (early && idle));
   const ph = <div className="w-[300px] h-[620px] sm:w-[320px] sm:h-[660px] rounded-[48px] bg-white/[0.03] border border-white/[0.06]" />;
+  const [w, h] = size.current || (isSmall() ? [300, 620] : [320, 660]);
   return (
-    <div ref={ref} className={className}>
+    <div ref={ref} className={className} style={on && !shown ? { contentVisibility: 'hidden', containIntrinsicSize: `${w}px ${h}px` } : undefined}>
       {on ? <Suspense fallback={ph}>{children}</Suspense> : ph}
     </div>
   );
@@ -118,35 +148,45 @@ function Near({ children, className = '', margin = '500px 0px' }) {
 // ───────── Zone de saisie de l'idée (avec machine à écrire) ─────────
 function IdeaBox({ big = true }) {
   const [idea, setIdea] = useState('');
-  const [ph, setPh] = useState('');
-  const [k, setK] = useState(0);
+  const box = useRef(null);
+  const ta = useRef(null);
+  // machine à écrire : écrit directement dans le champ (aucun re-rendu), et s'arrête hors écran
   useEffect(() => {
-    if (idea) return;
-    const text = EXAMPLES[k % EXAMPLES.length].idea;
+    const el = ta.current;
+    if (idea || !el) return;
+    let k = 0;
     let n = 0;
     let dir = 1;
-    const id = setInterval(() => {
+    let id = 0;
+    const tick = () => {
+      const text = EXAMPLES[k % EXAMPLES.length].idea;
       n += dir * (dir > 0 ? 1 : 3);
-      setPh(text.slice(0, n));
+      el.placeholder = text.slice(0, Math.max(0, n)) + '▍';
       if (n >= text.length + 26) dir = -1;
       if (n <= 0 && dir < 0) {
-        clearInterval(id);
-        setK((x) => x + 1);
+        k++;
+        n = 0;
+        dir = 1;
       }
-    }, 38);
-    return () => clearInterval(id);
-  }, [k, idea]);
+    };
+    const start = () => !id && (id = setInterval(tick, 45));
+    const stop = () => (clearInterval(id), (id = 0));
+    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? start() : stop()));
+    io.observe(box.current || el);
+    return () => (io.disconnect(), stop());
+  }, [idea]);
   const submit = () => idea.trim().length > 3 && go(`/studio?idea=${encodeURIComponent(idea.trim())}`);
   return (
-    <div className="w-full">
+    <div ref={box} className="w-full">
       <div className="relative rounded-[28px] p-[1.5px] bg-[linear-gradient(135deg,rgba(255,138,61,0.85),rgba(255,77,94,0.55)_40%,rgba(255,255,255,0.12)_75%)] shadow-[0_30px_80px_-30px_rgba(255,77,94,0.55)]">
         <div className="rounded-[26px] bg-[#120f18]/90 backdrop-blur-xl p-3 sm:p-4">
           <textarea
+            ref={ta}
             value={idea}
             onChange={(e) => setIdea(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), submit())}
             rows={big ? 3 : 2}
-            placeholder={ph + '▍'}
+            placeholder="▍"
             aria-label="Décris ton application"
             className="w-full bg-transparent outline-none resize-none text-[16px] sm:text-[18px] leading-relaxed text-sand placeholder:text-dune/70 px-2 pt-1"
           />
@@ -191,23 +231,40 @@ const TRADES = [
 
 export default function Landing() {
   const heroRef = useRef(null);
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
+  // progression du défilement dans le haut de page (0 → 1), calculée sans mesurer toute la page
+  const scrollYProgress = useMotionValue(0);
+  useEffect(() => {
+    const el = heroRef.current;
+    if (!el) return;
+    let h = el.offsetHeight || 1;
+    const onResize = () => (h = el.offsetHeight || 1);
+    const onScroll = () => {
+      const p = Math.min(1, Math.max(0, window.scrollY / h));
+      if (p !== scrollYProgress.get()) scrollYProgress.set(p);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize);
+    return () => (window.removeEventListener('scroll', onScroll), window.removeEventListener('resize', onResize));
+  }, [scrollYProgress]);
   const heroY = useTransform(scrollYProgress, [0, 1], [0, 160]);
   const heroFade = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+  const root = useRef(null);
   useHashScroll();
   useEffect(() => {
     document.title = `${BRAND.name} — Décris ton app, elle prend vie`;
   }, []);
+  // sections hors écran : animations CSS en pause (défilé, fonds, grain…)
+  useEffect(() => pauseAllOffscreen(root.current?.querySelectorAll('section, [data-pause]') || []), []);
 
   return (
-    <div className="relative bg-ink text-sand overflow-x-hidden">
+    <div ref={root} className="relative bg-ink text-sand overflow-x-hidden">
       <SiteHeader />
 
       {/* ───── Hero vidéo ───── */}
       <section ref={heroRef} className="relative min-h-[100svh] flex items-center justify-center overflow-hidden">
         <motion.div className="absolute inset-0" style={{ y: heroY }}>
-          <MotionArt primary="#ff6a3d" accent="#d8407a" illu={false} />
-          <LoopVideo eager className="absolute inset-0" sources={['/media/hero.webm', '/media/hero.mp4']} mobileSources={['/media/hero-mobile.webm', '/media/hero-mobile.mp4', '/media/hero.mp4']} poster="/media/hero-poster.jpg" fallback="transparent" />
+          <LoopVideo eager className="absolute inset-0" art={<MotionArt primary="#ff6a3d" accent="#d8407a" illu={false} />} sources={['/media/hero.webm', '/media/hero.mp4']} mobileSources={['/media/hero-mobile.webm', '/media/hero-mobile.mp4', '/media/hero.mp4']} poster="/media/hero-poster.jpg" fallback="#120f18" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(11,10,16,0.35),rgba(11,10,16,0.88)_70%)]" />
           <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-ink to-transparent" />
         </motion.div>
@@ -218,10 +275,10 @@ export default function Landing() {
             Défar veut dire « construire » en wolof
           </motion.div>
           <h1 className="font-display text-[54px] sm:text-[84px] md:text-[104px] leading-[0.9] tracking-[-0.02em] mt-6">
-            <motion.span initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }} className="block">
+            <motion.span initial={{ opacity: 0, y: 40, ...(FX && { filter: 'blur(10px)' }) }} animate={{ opacity: 1, y: 0, ...(FX && { filter: 'blur(0px)' }) }} transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }} className="block">
               Décris ton app.
             </motion.span>
-            <motion.em initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} transition={{ duration: 1, delay: 0.25, ease: [0.16, 1, 0.3, 1] }} className="block text-transparent bg-clip-text bg-[linear-gradient(100deg,#ffb86b,#ff6a3d_30%,#ff4d5e_60%,#e0679d)]">
+            <motion.em initial={{ opacity: 0, y: 40, ...(FX && { filter: 'blur(10px)' }) }} animate={{ opacity: 1, y: 0, ...(FX && { filter: 'blur(0px)' }) }} transition={{ duration: 1, delay: 0.25, ease: [0.16, 1, 0.3, 1] }} className="block text-transparent bg-clip-text bg-[linear-gradient(100deg,#ffb86b,#ff6a3d_30%,#ff4d5e_60%,#e0679d)]">
               Elle prend vie.
             </motion.em>
           </h1>
@@ -234,14 +291,14 @@ export default function Landing() {
         </motion.div>
         <motion.a href="#demo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.6 }} className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-sand/50">
           Regarde
-          <motion.span animate={{ y: [0, 6, 0] }} transition={{ duration: 1.6, repeat: Infinity }}>
+          <span className="inline-block" style={{ animation: 'nudge 1.6s ease-in-out infinite' }}>
             <I n="chevron-right" s={18} className="rotate-90" />
-          </motion.span>
+          </span>
         </motion.a>
       </section>
 
       {/* ───── Bandeau défilant ───── */}
-      <div className="relative border-y border-white/[0.06] py-5 overflow-hidden">
+      <div className="relative border-y border-white/[0.06] py-5 overflow-hidden" data-pause>
         <div className="flex gap-10 whitespace-nowrap w-max" style={{ animation: 'marquee 40s linear infinite' }}>
           {[0, 1].map((k) => (
             <div key={k} className="flex gap-10 items-center font-display italic text-[28px] text-sand/40">
@@ -274,7 +331,7 @@ export default function Landing() {
               { cat: 'finance', idea: 'Tontine digitale entre amis', caption: 'Tontine · cotisation mobile', delay: 900 },
             ].map((d) => (
               <div key={d.cat} className="snap-center shrink-0">
-                <Near>
+                <Near early>
                   <LiveDemo {...d} />
                 </Near>
               </div>
@@ -298,8 +355,7 @@ export default function Landing() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-14">
             {TRADES.map((t, i) => (
               <motion.button key={t.label} type="button" onClick={() => go(`/studio?tpl=${t.tpl}`)} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.2 }} transition={{ delay: (i % 4) * 0.08, duration: 0.7 }} className={`group relative overflow-hidden rounded-3xl text-left ${i % 3 === 0 ? 'aspect-[3/4]' : 'aspect-[3/4] lg:aspect-[3/4]'}`}>
-                <MotionArt tpl={t.tpl} primary={t.c[0]} accent={t.c[1]} />
-                <LoopVideo className="absolute inset-0 transition-transform duration-700 group-hover:scale-105" sources={[...mixkitSources(t.v)].reverse()} poster={mixkitPoster(t.v, t.t)} fallback="transparent" />
+                <LoopVideo className="absolute inset-0 transition-transform duration-700 group-hover:scale-105" art={<MotionArt tpl={t.tpl} primary={t.c[0]} accent={t.c[1]} />} sources={[...mixkitSources(t.v)].reverse()} poster={mixkitPoster(t.v, t.t)} fallback={`linear-gradient(160deg, #0d0b14, ${t.c[0]}55)`} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
                   <p className="font-display text-[24px] sm:text-[28px] leading-none">{t.label}</p>
@@ -342,8 +398,7 @@ export default function Landing() {
       {/* ───── Film ───── */}
       <section className="relative py-10 px-5">
         <motion.div {...reveal} className="max-w-6xl mx-auto relative rounded-[36px] overflow-hidden border border-white/[0.08] aspect-video">
-          <MotionArt primary="#ff6a3d" accent="#d8407a" illu={false} />
-          <LoopVideo className="absolute inset-0" sources={['/media/film.webm', '/media/film.mp4']} poster="/media/film-poster.jpg" fallback="transparent" />
+          <LoopVideo className="absolute inset-0" art={<MotionArt primary="#ff6a3d" accent="#d8407a" illu={false} />} sources={['/media/film.webm', '/media/film.mp4']} poster="/media/film-poster.jpg" fallback="#120f18" />
           <div className="absolute left-5 bottom-5 sm:left-8 sm:bottom-8 inline-flex items-center gap-2 h-9 px-4 rounded-full bg-black/45 backdrop-blur text-[13px] text-white/85">
             <I n="film" s={15} /> {BRAND.name} en 26 secondes
           </div>
@@ -379,7 +434,7 @@ export default function Landing() {
             </div>
           </motion.div>
           <motion.div {...reveal} className="relative flex justify-center">
-            <div className="absolute w-[420px] h-[420px] rounded-full blur-[110px] opacity-40 bg-[radial-gradient(circle,#ff6a3d,transparent_65%)]" />
+            <div className="absolute w-[640px] h-[640px] opacity-40 bg-[radial-gradient(closest-side,#ff6a3d,rgba(255,106,61,0.35)_45%,transparent)] pointer-events-none" />
             <Near>
               <CheckoutDemo />
             </Near>
@@ -410,7 +465,7 @@ export default function Landing() {
       {/* ───── Appel final ───── */}
       <section className="relative py-32 px-5 overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[500px] rounded-full blur-[140px] opacity-35 bg-[radial-gradient(ellipse,#ff6a3d,#d8407a_45%,transparent_70%)]" />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[760px] opacity-35 bg-[radial-gradient(closest-side,#ff6a3d,rgba(216,64,122,0.6)_45%,transparent)]" />
         </div>
         <div className="relative max-w-3xl mx-auto text-center">
           <motion.h2 {...reveal} className="font-display text-[52px] sm:text-[78px] leading-[0.92]">

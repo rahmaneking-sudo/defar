@@ -25,7 +25,7 @@ export function Products({ block }) {
         <SectionHead eyebrow={block.eyebrow} title={block.title} onAction={block.action ? () => rt.run(block.action) : null} />
         <div className="flex flex-col gap-3">
           {items.map((it, i) => (
-            <motion.div key={it.id} layout whileTap={{ scale: 0.985 }} onClick={(e) => rt.run(it.action, { item: it, el: e.currentTarget })} data-tour="product-card" className="app-card flex items-center gap-3.5 p-2.5 pr-3.5 cursor-pointer" initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ delay: Math.min(i, 4) * 0.04 }}>
+            <motion.div key={it.id} whileTap={{ scale: 0.985 }} onClick={(e) => rt.run(it.action, { item: it, el: e.currentTarget })} data-tour="product-card" className="app-card flex items-center gap-3.5 p-2.5 pr-3.5 cursor-pointer" initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ delay: Math.min(i, 4) * 0.04 }}>
               <div className="relative w-[96px] h-[104px] shrink-0 overflow-hidden" style={{ borderRadius: 'calc(var(--app-radius) - 4px)' }}>
                 <Img src={it.image} w={280} className="absolute inset-0" />
                 {it.badge && <span className="absolute top-1.5 left-1.5 h-5 px-1.5 rounded-full text-[9.5px] font-bold flex items-center bg-white/90 text-black">{it.badge}</span>}

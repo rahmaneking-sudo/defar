@@ -108,6 +108,12 @@ export function uid(prefix = 'id') {
 }
 
 // Format prix FCFA : 12500 -> "12 500 F"
+// 12500 -> « 12 500 » (rapide : pas d'Intl à chaque image d'animation)
+export function groupThousands(n) {
+  const v = Math.round(Number(n) || 0);
+  return (v < 0 ? '-' : '') + Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
 export function formatMoney(n, currency = 'FCFA', compact = false) {
   const v = Math.round(Number(n) || 0);
   const s = Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');

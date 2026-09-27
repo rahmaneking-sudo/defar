@@ -125,6 +125,26 @@ export function HomeIndicator({ light = false, device = 'iphone' }) {
   );
 }
 
+// Repère de l'onglet actif : un seul élément déplacé en CSS (fluide, sans mesure de la page).
+const SLIDE = 'transform .42s cubic-bezier(.2,.9,.25,1.12), opacity .2s';
+function TabIndicator({ n, index, floating }) {
+  const on = index >= 0;
+  const i = Math.max(0, index);
+  if (floating)
+    return (
+      <span
+        aria-hidden="true"
+        className="absolute rounded-full pointer-events-none"
+        style={{ top: 9, bottom: 9, left: 12, width: `calc((100% - 12px) / ${n} - 12px)`, background: 'var(--app-primary-soft)', transform: `translateX(calc(${i} * (100% + 12px)))`, opacity: on ? 1 : 0, transition: SLIDE }}
+      />
+    );
+  return (
+    <span aria-hidden="true" className="absolute top-0 left-0 flex justify-center pointer-events-none" style={{ width: `calc(100% / ${n})`, transform: `translateX(${i * 100}%)`, opacity: on ? 1 : 0, transition: SLIDE }}>
+      <span className="h-[3px] w-8 rounded-b-full" style={{ background: 'var(--app-primary)' }} />
+    </span>
+  );
+}
+
 // ───────── Barre d'onglets ─────────
 export function TabBar({ tabs, active, onSelect, visible, cartScreen, cartCount, floating, safeBottom }) {
   return (
@@ -139,7 +159,7 @@ export function TabBar({ tabs, active, onSelect, visible, cartScreen, cartCount,
           style={{ paddingBottom: floating ? safeBottom : 0, paddingLeft: floating ? 14 : 0, paddingRight: floating ? 14 : 0 }}
         >
           <div
-            className="relative flex items-stretch"
+            className={`relative flex items-stretch ${floating ? 'fx-bar-el' : 'fx-bar'}`}
             style={
               floating
                 ? {
@@ -161,14 +181,12 @@ export function TabBar({ tabs, active, onSelect, visible, cartScreen, cartCount,
                   }
             }
           >
+            <TabIndicator n={tabs.length} index={tabs.findIndex((t) => t.screen === active)} floating={floating} />
             {tabs.map((t) => {
               const on = t.screen === active;
               const isCart = t.screen === cartScreen;
               return (
                 <button key={t.screen} type="button" onClick={() => onSelect(t.screen)} className="relative flex-1 flex flex-col items-center justify-center gap-[3px]" data-cart-target={isCart ? 'true' : undefined} data-tour={`tab-${t.screen}`}>
-                  {on && floating && (
-                    <motion.span layoutId="tabpill" className="absolute inset-y-[9px] inset-x-[6px] rounded-full" style={{ background: 'var(--app-primary-soft)' }} transition={{ type: 'spring', stiffness: 500, damping: 38 }} />
-                  )}
                   <span className="relative" style={{ color: on ? 'var(--app-primary-ink)' : 'var(--app-muted)', transition: 'color .2s' }}>
                     <motion.span className="inline-flex" animate={{ scale: on ? 1.08 : 1, y: on ? -1 : 0 }} transition={{ type: 'spring', stiffness: 500, damping: 22 }}>
                       <Icon name={t.icon} size={22} strokeWidth={on ? 2.3 : 1.9} />
@@ -192,7 +210,6 @@ export function TabBar({ tabs, active, onSelect, visible, cartScreen, cartCount,
                   <span className="relative text-[10.5px] font-semibold tracking-tight" style={{ color: on ? 'var(--app-primary-ink)' : 'var(--app-muted)' }}>
                     {t.label}
                   </span>
-                  {on && !floating && <motion.span layoutId="tabdot" className="absolute top-0 h-[3px] w-8 rounded-b-full" style={{ background: 'var(--app-primary)' }} />}
                 </button>
               );
             })}
@@ -210,7 +227,7 @@ export function WebNav({ tabs, active, onSelect, onHome, name, cartScreen, cartC
   const initial = String(name || '?').trim()[0]?.toUpperCase() || '?';
   return (
     <nav
-      className="absolute top-0 left-0 right-0 z-[60]"
+      className="fx-bar absolute top-0 left-0 right-0 z-[60]"
       style={{ height: WEB_NAV_H, background: 'color-mix(in srgb, var(--app-bg) 82%, transparent)', backdropFilter: 'blur(20px) saturate(1.6)', WebkitBackdropFilter: 'blur(20px) saturate(1.6)', borderBottom: '1px solid var(--app-border)' }}
       data-web-nav
     >
@@ -228,7 +245,7 @@ export function WebNav({ tabs, active, onSelect, onHome, name, cartScreen, cartC
               return (
                 <button key={t.screen} type="button" onClick={() => onSelect(t.screen)} className="relative h-10 px-3.5 text-[14.5px] font-semibold whitespace-nowrap" style={{ color: on ? 'var(--app-text)' : 'var(--app-muted)' }} data-tour={`tab-${t.screen}`}>
                   {t.label}
-                  {on && <motion.span layoutId="webnav" className="absolute left-3.5 right-3.5 -bottom-[1px] h-[2px] rounded-full" style={{ background: 'var(--app-primary)' }} transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
+                  {on && <motion.span className="absolute left-3.5 right-3.5 -bottom-[1px] h-[2px] rounded-full" style={{ background: 'var(--app-primary)' }} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
                 </button>
               );
             })}

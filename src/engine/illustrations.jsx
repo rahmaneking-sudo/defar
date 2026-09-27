@@ -1,5 +1,6 @@
 // Illustrations animées (SVG + motion) aux couleurs de l'app. Aucun fichier externe.
-import { motion } from 'motion/react';
+import { useRef } from 'react';
+import { motion, useInView } from 'motion/react';
 
 const P = 'var(--app-primary)';
 const A = 'var(--app-accent)';
@@ -258,11 +259,14 @@ const Empty = () => (
 
 export const ILLUSTRATIONS = { delivery: Delivery, payment: Payment, booking: Booking, shopping: Shopping, success: Success, health: Health, learning: Learning, growth: Growth, chat: Chat, location: Location, gift: Gift, security: Security, empty: Empty };
 
+// Animée seulement quand elle est à l'écran (sinon, zéro calcul).
 export function Illustration({ name = 'empty', size = 220 }) {
   const C = ILLUSTRATIONS[name] || Empty;
+  const ref = useRef(null);
+  const on = useInView(ref, { margin: '120px 0px' });
   return (
-    <div className="inline-flex" style={{ width: size, height: (size * 200) / 240 }}>
-      <C />
+    <div ref={ref} className="inline-flex" style={{ width: size, height: (size * 200) / 240 }}>
+      {on && <C />}
     </div>
   );
 }

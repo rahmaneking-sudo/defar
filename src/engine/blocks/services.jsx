@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, animate, useMotionValue, useMotionValueEvent } from 'motion/react';
 import QRCode from 'qrcode';
 import { useRt, useScreen } from '../context.js';
@@ -13,7 +13,6 @@ const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'aoû
 export function Booking({ block }) {
   const rt = useRt();
   const scr = useScreen();
-  const id = useId();
   const p = scr.params.item;
   const svc = block.service || (p?.title ? { title: p.title, price: p.price, image: p.image, duration: p.meta } : rt.booking?.service || null);
   const days = useMemo(() => {
@@ -66,7 +65,7 @@ export function Booking({ block }) {
       <div className="hscroll gap-2 -mx-5 px-5 pb-1">
         {days.map((d, i) => (
           <motion.button key={i} type="button" whileTap={{ scale: 0.92 }} disabled={d.closed} onClick={() => { setDay(i); setSlot(null); }} data-tour={`day-${i}`} className="relative shrink-0 w-[58px] h-[76px] flex flex-col items-center justify-center gap-1" style={{ borderRadius: 'min(var(--app-radius), 20px)', opacity: d.closed ? 0.4 : 1 }}>
-            {i === day ? <motion.span layoutId={`day-${id}`} className="absolute inset-0" style={{ borderRadius: 'min(var(--app-radius), 20px)', background: 'var(--app-primary)', boxShadow: '0 10px 20px -10px var(--app-primary)' }} transition={{ type: 'spring', stiffness: 500, damping: 36 }} /> : <span className="absolute inset-0 bg-app-surface" style={{ borderRadius: 'min(var(--app-radius), 20px)' }} />}
+            {i === day ? <motion.span className="absolute inset-0" style={{ borderRadius: 'min(var(--app-radius), 20px)', background: 'var(--app-primary)', boxShadow: '0 10px 20px -10px var(--app-primary)' }} initial={{ scale: 0.86, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 520, damping: 32 }} /> : <span className="absolute inset-0 bg-app-surface" style={{ borderRadius: 'min(var(--app-radius), 20px)' }} />}
             <span className="relative text-[11.5px] font-semibold" style={{ color: i === day ? 'var(--app-on-primary)' : 'var(--app-muted)' }}>{d.wd}</span>
             <span className="relative text-[19px] font-bold" style={{ color: i === day ? 'var(--app-on-primary)' : 'var(--app-text)' }}>{d.n}</span>
           </motion.button>
@@ -253,7 +252,7 @@ export function Tracking({ block, index }) {
         <div className="flex gap-1.5 mt-4">
           {steps.map((s, i) => (
             <div key={i} className="flex-1 h-1.5 rounded-full bg-app-surface overflow-hidden">
-              <motion.div className="h-full rounded-full" style={{ background: 'var(--app-primary)' }} initial={{ width: 0 }} animate={{ width: i < doneCount ? '100%' : i === doneCount ? ['0%', '70%', '0%'] : '0%' }} transition={i === doneCount ? { duration: 2.2, repeat: Infinity } : { duration: 0.6, delay: i * 0.2 }} />
+              <motion.div className="h-full rounded-full" style={{ background: 'var(--app-primary)', originX: 0 }} initial={{ scaleX: 0 }} animate={{ scaleX: i < doneCount ? 1 : i === doneCount ? [0, 0.7, 0] : 0 }} transition={i === doneCount ? { duration: 2.2, repeat: Infinity } : { duration: 0.6, delay: i * 0.2 }} />
             </div>
           ))}
         </div>

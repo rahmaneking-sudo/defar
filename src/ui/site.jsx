@@ -34,7 +34,7 @@ export function SiteHeader({ active }) {
       </Link>
     );
   return (
-    <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled || open ? 'bg-ink/80 backdrop-blur-xl border-b border-white/[0.06]' : ''}`}>
+    <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled || open ? 'bg-ink/80 pointer-coarse:bg-ink/95 backdrop-blur-xl border-b border-white/[0.06]' : ''}`}>
       <div className="max-w-7xl mx-auto h-16 px-5 flex items-center gap-8">
         <Link to="/" aria-label={`${BRAND.name} — accueil`}>
           <Logo />

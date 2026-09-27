@@ -150,7 +150,7 @@ export function StoryViewer({ story, onClose }) {
           <div className="absolute left-3 right-3 flex gap-1" style={{ top: 58 }}>
             {story.items.map((_, k) => (
               <div key={k} className="h-[3px] flex-1 rounded-full bg-white/30 overflow-hidden">
-                <motion.div className="h-full bg-white" initial={{ width: k < i ? '100%' : '0%' }} animate={{ width: k < i ? '100%' : k === i ? '100%' : '0%' }} transition={{ duration: k === i ? 4.2 : 0, ease: 'linear' }} />
+                <motion.div className="h-full bg-white" style={{ originX: 0 }} initial={{ scaleX: k < i ? 1 : 0 }} animate={{ scaleX: k <= i ? 1 : 0 }} transition={{ duration: k === i ? 4.2 : 0, ease: 'linear' }} />
               </div>
             ))}
           </div>

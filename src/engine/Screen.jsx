@@ -1,7 +1,8 @@
 // Un écran : en-tête (4 styles), zone défilante de blocs, pied collant.
-import { Component, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { motion, useScroll, useTransform, useMotionValueEvent } from 'motion/react';
+import { Component, startTransition, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { motion, useMotionValue, useTransform, useMotionValueEvent } from 'motion/react';
 import { ScreenCtx, useRt } from './context.js';
+import { pauseOffscreen } from '../lib/offscreen.js';
 import { BLOCK_COMPONENTS } from './blocks/index.js';
 import { Avatar, Icon, RoundIcon, Money } from './ui.jsx';
 import { LiveFooter } from './live.jsx';
@@ -33,12 +34,16 @@ function BlockFrame({ block, index }) {
   const rt = useRt();
   const scr = useContext(ScreenCtx);
   const C = BLOCK_COMPONENTS[block.type];
+  const ref = useRef(null);
+  // bloc sorti de l'écran : ses animations (vidéos, défilés, fonds animés) se mettent en pause
+  useEffect(() => pauseOffscreen(ref.current), [C]);
   if (!C) return null;
   const edit = rt.mode === 'edit';
   const selected = edit && rt.selectedBlock === block.id;
   const noAnim = index === 0 || block.type === 'hero' || rt.mode === 'thumb';
   return (
     <motion.section
+      ref={ref}
       data-block={block.type}
       data-block-id={block.id}
       className="edit-outline relative"
@@ -73,10 +78,18 @@ function BlockFrame({ block, index }) {
 export function Screen({ entry, screen, isTop, canBack, isTabRoot }) {
   const rt = useRt();
   const scrollRef = useRef(null);
-  const { scrollY } = useScroll({ container: scrollRef });
+  // position de défilement : simple lecture de scrollTop (pas de mesure complète de la page à chaque image)
+  const scrollY = useMotionValue(0);
   const [query, setQuery] = useState('');
   const [detail, setDetail] = useState(null);
   const blocks = screen.blocks || [];
+  // Premier affichage : les 3 premiers blocs tout de suite, le reste juste après (rendu interruptible)
+  const [full, setFull] = useState(() => rt.mode !== 'play' || rt.autopilot || blocks.length <= 3);
+  useEffect(() => {
+    if (full) return;
+    const id = requestAnimationFrame(() => startTransition(() => setFull(true)));
+    return () => cancelAnimationFrame(id);
+  }, [full]);
   const first = blocks[0];
   const isOnboarding = first?.type === 'onboarding';
   const hasChat = blocks.some((b) => b.type === 'chat');
@@ -115,6 +128,15 @@ export function Screen({ entry, screen, isTop, canBack, isTabRoot }) {
     if (isTop) rt.setStatusLight(rt.palette.dark || overlay || (isOnboarding && true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTop, overlay, isOnboarding, rt.palette.dark]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || rt.mode === 'thumb') return;
+    const on = () => scrollY.set(el.scrollTop);
+    on();
+    el.addEventListener('scroll', on, { passive: true });
+    return () => el.removeEventListener('scroll', on);
+  }, [scrollY, rt.mode, hasChat, isOnboarding]);
 
   useEffect(() => {
     if (isTop) rt.registerScroll(scrollRef);
@@ -173,7 +195,7 @@ export function Screen({ entry, screen, isTop, canBack, isTabRoot }) {
                 {hs === 'greeting' && !overlay && <Greeting header={screen.header} />}
               </>
             )}
-            {blocks.map((b, i) => (
+            {(rt.mode === 'thumb' ? blocks.slice(0, 4) : full ? blocks : blocks.slice(0, 3)).map((b, i) => (
               <BlockFrame key={b.id} block={b} index={i} />
             ))}
             {showFooter && <LiveFooter />}
@@ -266,7 +288,7 @@ function TopBar({ screen, hs, overlay, canBack, scrollY, threshold, safeTop }) {
   return (
     <div className="absolute top-0 left-0 right-0 z-[40]" style={{ height: safeTop + 48 }}>
       <motion.div
-        className="absolute inset-0"
+        className="fx-bar absolute inset-0"
         style={{
           opacity: bg,
           background: 'color-mix(in srgb, var(--app-bg) 86%, transparent)',

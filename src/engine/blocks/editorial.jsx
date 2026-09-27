@@ -7,7 +7,7 @@ import { useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { useRt } from '../context.js';
 import { Avatar, CountUp, Icon, Img, Money, Rich, SectionHead, Stars } from '../ui.jsx';
-import { initials } from '../../../shared/utils.js';
+import { initials, groupThousands } from '../../../shared/utils.js';
 
 const reveal = { initial: { opacity: 0, y: 24 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: 0.3 }, transition: { type: 'spring', stiffness: 200, damping: 28 } };
 
@@ -196,7 +196,7 @@ export function Bento({ block }) {
                 {it.icon ? <Icon name={it.icon} size={18} style={{ opacity: 0.8 }} /> : <span />}
                 <div>
                   <p className="app-display app-num font-bold leading-none" style={{ fontSize: it.span === 2 ? 44 : 34 }}>
-                    {Number.isFinite(it.value) ? <CountUp value={it.value} format={(n) => (Math.abs(it.value) < 10 && !Number.isInteger(it.value) ? n.toFixed(1).replace('.', ',') : Math.round(n).toLocaleString('fr-FR').replace(/ | /g, ' '))} /> : it.value}
+                    {Number.isFinite(it.value) ? <CountUp value={it.value} format={(n) => (Math.abs(it.value) < 10 && !Number.isInteger(it.value) ? n.toFixed(1).replace('.', ',') : groupThousands(n))} /> : it.value}
                     {it.suffix && <span className="text-[0.5em] ml-0.5 opacity-80">{it.suffix}</span>}
                   </p>
                   {it.title && <p className="text-[12px] font-semibold mt-1.5 opacity-80 leading-tight">{it.title}</p>}

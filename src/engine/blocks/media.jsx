@@ -137,7 +137,7 @@ export function VideoBlock({ block }) {
           {block.title && <h3 className="app-heading text-[19px] font-bold leading-tight"><Rich text={block.title} /></h3>}
           {block.subtitle && <p className="text-[13px] opacity-85 mt-1 line-clamp-2">{block.subtitle}</p>}
           <div className="mt-3 h-[3px] rounded-full bg-white/25 overflow-hidden">
-            <motion.div className="h-full bg-white" initial={{ width: '0%' }} animate={{ width: paused ? undefined : '100%' }} transition={{ duration: 14, repeat: Infinity, ease: 'linear' }} />
+            <motion.div className="h-full bg-white" style={{ originX: 0 }} initial={{ scaleX: 0 }} animate={{ scaleX: paused ? undefined : 1 }} transition={{ duration: 14, repeat: Infinity, ease: 'linear' }} />
           </div>
         </div>
         {reel && (

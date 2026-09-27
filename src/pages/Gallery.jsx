@@ -12,6 +12,9 @@ import { AppPlayer, FitPhone } from '../engine/Player.jsx';
 import { computeRoutes } from '../engine/context.js';
 import { localSpec, shareUrl } from '../lib/specs.js';
 import { playTour } from '../lib/tours.js';
+import { isTouch, useQueuedMount } from '../lib/offscreen.js';
+
+const FX = !isTouch(); // effets de flou réservés aux ordinateurs
 
 const CATS = Object.keys(CATEGORY_INFO);
 const specCache = new Map();
@@ -43,12 +46,12 @@ export default function Gallery() {
       <SiteHeader active="/galerie" />
       <section className="relative pt-36 pb-10 px-5 overflow-hidden">
         <Pattern opacity={0.035} />
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[520px] rounded-full blur-[130px] opacity-30 bg-[radial-gradient(ellipse,#ff6a3d,#d8407a_45%,transparent_70%)] pointer-events-none" />
+        <div className="absolute -top-56 left-1/2 -translate-x-1/2 w-[1100px] h-[720px] opacity-30 bg-[radial-gradient(closest-side,#ff6a3d,rgba(216,64,122,0.55)_45%,transparent)] pointer-events-none" />
         <div className="relative max-w-6xl mx-auto">
           <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-[12.5px] uppercase tracking-[0.2em] text-sunset">
             Galerie · {CATS.length} modèles
           </motion.p>
-          <motion.h1 initial={{ opacity: 0, y: 30, filter: 'blur(8px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }} className="font-display text-[52px] sm:text-[80px] leading-[0.92] mt-4 max-w-4xl">
+          <motion.h1 initial={{ opacity: 0, y: 30, ...(FX && { filter: 'blur(8px)' }) }} animate={{ opacity: 1, y: 0, ...(FX && { filter: 'blur(0px)' }) }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }} className="font-display text-[52px] sm:text-[80px] leading-[0.92] mt-4 max-w-4xl">
             Un métier, <em className="text-transparent bg-clip-text bg-[linear-gradient(100deg,#ffb86b,#ff6a3d_35%,#ff4d5e_65%,#e0679d)]">une app vivante.</em>
           </motion.h1>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }} className="text-sand/65 text-[17px] mt-6 max-w-2xl leading-relaxed">
@@ -66,13 +69,11 @@ export default function Gallery() {
       </section>
 
       <section className="relative px-5 pb-24">
-        <motion.div layout className="max-w-6xl mx-auto grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          <AnimatePresence mode="popLayout">
-            {list.map((cat, i) => (
-              <TemplateCard key={cat} cat={cat} index={i} onOpen={() => show(cat)} />
-            ))}
-          </AnimatePresence>
-        </motion.div>
+        <div className="max-w-6xl mx-auto grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {list.map((cat, i) => (
+            <TemplateCard key={cat} cat={cat} index={i} onOpen={() => show(cat)} />
+          ))}
+        </div>
       </section>
 
       <section className="relative px-5 pb-28">
@@ -98,32 +99,32 @@ export default function Gallery() {
 // ───────── Carte d'un modèle (aperçu vivant, chargé à l'approche) ─────────
 function TemplateCard({ cat, index, onOpen }) {
   const info = CATEGORY_INFO[cat];
-  const spec = templateSpec(cat);
   const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '300px 0px' });
-  const p = spec.theme.primary;
-  const a = spec.theme.accent || p;
+  // le modèle n'est calculé qu'à l'approche, et l'aperçu vivant se monte pendant un temps libre
+  const near = useInView(ref, { once: true, margin: '500px 0px' });
+  const spec = near ? templateSpec(cat) : null;
+  const inView = useQueuedMount(near);
+  const p = spec?.theme.primary || '#3a2f45';
+  const a = spec?.theme.accent || p;
   return (
     <motion.article
       ref={ref}
-      layout
       initial={{ opacity: 0, y: 26 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.55, delay: (index % 3) * 0.06, ease: [0.16, 1, 0.3, 1] }}
       className="group relative rounded-[30px] border border-white/[0.07] bg-ink-2/70 overflow-hidden hover:border-white/15 transition-colors"
     >
       <div
         role="button"
         tabIndex={0}
-        aria-label={`Tester ${spec.meta.name}`}
+        aria-label={`Tester ${spec?.meta.name || info.label}`}
         onClick={onOpen}
         onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onOpen())}
         className="relative block w-full h-[430px] overflow-hidden cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-sunset/70"
       >
         <div className="absolute inset-0 opacity-60 group-hover:opacity-100 transition-opacity duration-500" style={{ background: `radial-gradient(60% 55% at 50% 40%, ${p}66, transparent 70%), radial-gradient(45% 40% at 85% 95%, ${a}44, transparent 70%)` }} />
         <div className="absolute inset-x-0 top-8 -bottom-[130px] pointer-events-none transition-transform duration-700 ease-[cubic-bezier(.16,1,.3,1)] group-hover:-translate-y-4">
-          {inView && (
+          {inView && spec && (
             <FitPhone className="w-full h-full" pad={0}>
               <AppPlayer spec={spec} mode="thumb" reducedMotion screenId={computeRoutes(spec).home} />
             </FitPhone>
@@ -141,9 +142,9 @@ function TemplateCard({ cat, index, onOpen }) {
             <span className="w-3.5 h-3.5 rounded-full ring-2 ring-[#131019]" style={{ background: a }} />
           </span>
           <span className="uppercase tracking-[0.12em]">{info.label}</span>
-          <span className="ml-auto">{spec.screens.length} écrans</span>
+          {spec && <span className="ml-auto">{spec.screens.length} écrans</span>}
         </div>
-        <h3 className="font-display text-[32px] leading-none mt-3">{spec.meta.name}</h3>
+        <h3 className="font-display text-[32px] leading-none mt-3">{spec ? spec.meta.name : '\u00a0'}</h3>
         <p className="text-sand/60 text-[14px] mt-2">{info.blurb}</p>
         <div className="flex gap-2 mt-4">
           <Button size="sm" icon="play" onClick={onOpen}>

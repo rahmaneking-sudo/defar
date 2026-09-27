@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react';
+import { groupThousands } from '../../../shared/utils.js';
 import { motion } from 'motion/react';
 import { useRt } from '../context.js';
 import { CountUp, Icon, MotionBg, SectionHead, Rich } from '../ui.jsx';
@@ -198,7 +199,7 @@ export function Chart({ block }) {
 
 export function Progress({ block }) {
   const pct = Math.max(0, Math.min(1, block.value / block.max));
-  const fmt = (n) => Math.round(n).toLocaleString('fr-FR').replace(/ | /g, ' ');
+  const fmt = (n) => groupThousands(n);
   if (block.style === 'bar') {
     return (
       <div className="px-5">
